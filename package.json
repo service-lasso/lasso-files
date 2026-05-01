@@ -1,0 +1,32 @@
+{
+  "name": "lasso-files",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:ui": "vite build frontend --outDir ../build/public --emptyOutDir",
+    "package": "node scripts/package.mjs",
+    "test": "node scripts/verify.mjs",
+    "release:verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mime-types": "^2.1.35",
+    "multer": "^2.0.2"
+  },
+  "devDependencies": {
+    "@fontsource/nunito-sans": "^5.2.7",
+    "@vitejs/plugin-react-swc": "^3.5.0",
+    "axios": "^1.15.0",
+    "i18next": "^25.0.0",
+    "prop-types": "^15.8.1",
+    "react": "^18.3.1",
+    "react-collapsed": "^4.2.0",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.4.0",
+    "sass": "^1.77.6",
+    "vite": "^6.4.2"
+  }
+}
