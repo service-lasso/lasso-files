@@ -1,4 +1,6 @@
-.harness/
 dist/
 output/
-verify/service-harness.ci.json
+build/
+node_modules/
+frontend/dist/
+*.log
