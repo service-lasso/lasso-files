@@ -2,7 +2,7 @@
 
 Release-backed Service Lasso file manager service.
 
-`lasso-files` replaces the old TypeRefinery Koa/Angular files service with a modern Node/Express backend and a React file-manager UI copied from `C:\projects\github\react-file-manager`.
+`lasso-files` provides a Node/Express filesystem-backed API and a React file-manager UI for browsing, uploading, downloading, renaming, moving, copying, and deleting app-owned files.
 
 ## Service Contract
 
@@ -29,7 +29,7 @@ Each release contains:
 
 The canonical React UI contract is documented in [docs/url-contracts.md](docs/url-contracts.md).
 
-Legacy TypeRefinery compatibility and migration notes are documented in [docs/migration.md](docs/migration.md).
+Compatibility and migration notes for existing path-based integrations are documented in [docs/migration.md](docs/migration.md).
 
 ## Local Verification
 
