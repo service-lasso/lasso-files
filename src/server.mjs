@@ -2,13 +2,17 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { stat } from "node:fs/promises";
 import { FileStore } from "./file-store.mjs";
 import { normalizeRelativePath } from "./path-ids.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const publicRoot = path.join(packageRoot, "public");
+const publicRoot =
+  [path.join(packageRoot, "public"), path.join(packageRoot, "build", "public")].find((candidate) =>
+    existsSync(path.join(candidate, "index.html")),
+  ) ?? null;
 const dataRoot = path.resolve(
   process.env.FILES_DATA_PATH || process.env.SERVICE_DATA_PATH || path.join(packageRoot, "data"),
 );
@@ -27,6 +31,10 @@ const app = express();
 app.disable("x-powered-by");
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
+
+if (publicRoot) {
+  app.use(express.static(publicRoot, { index: false }));
+}
 
 app.get("/healthcheck", async (_request, response) => {
   await store.ensureRoot();
@@ -76,6 +84,12 @@ app.get("/api/file-system/download", async (request, response) => {
 app.use("/content", express.static(dataRoot, { fallthrough: false }));
 
 app.get(["/", "/files"], (_request, response) => {
+  if (!publicRoot) {
+    response.status(503).json({
+      error: "UI assets are missing. Run npm run build:ui before starting from source.",
+    });
+    return;
+  }
   response.sendFile(path.join(publicRoot, "index.html"));
 });
 

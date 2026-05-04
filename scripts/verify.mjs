@@ -97,7 +97,16 @@ const baseUrl = `http://127.0.0.1:${verifyPort}`;
 
 try {
   await waitForHealth(baseUrl);
-  await expectStatus(await fetch(`${baseUrl}/files`), 200, "ui");
+  const ui = await expectStatus(await fetch(`${baseUrl}/files`), 200, "ui");
+  const uiHtml = await ui.text();
+  const assetMatch = uiHtml.match(/src="(\/assets\/[^"]+\.js)"/);
+  if (!assetMatch) {
+    throw new Error("ui did not reference a built JavaScript asset");
+  }
+  const asset = await expectStatus(await fetch(`${baseUrl}${assetMatch[1]}`), 200, "ui asset");
+  if ((await asset.text()).length < 1000) {
+    throw new Error("ui asset response was unexpectedly small");
+  }
 
   const folderResponse = await expectStatus(
     await fetch(`${baseUrl}/api/file-system/folder`, {
