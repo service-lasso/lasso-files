@@ -8,7 +8,9 @@
     "start": "node scripts/start-local.mjs",
     "dev": "npm run build:ui && npm start",
     "package": "node scripts/package.mjs",
-    "test": "node scripts/verify.mjs",
+    "test": "npm run test:api && npm run test:e2e",
+    "test:api": "node scripts/verify.mjs",
+    "test:e2e": "playwright test",
     "release:verify": "node scripts/verify.mjs"
   },
   "dependencies": {
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@fontsource/nunito-sans": "^5.2.7",
+    "@playwright/test": "^1.59.1",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "axios": "^1.15.0",
     "i18next": "^25.0.0",

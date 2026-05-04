@@ -77,6 +77,7 @@ const FileManager = ({
   return (
     <main
       className={`file-explorer ${className}`}
+      data-testid="file-manager"
       onContextMenu={(e) => e.preventDefault()}
       style={{ ...customStyles, ...style }}
     >

@@ -70,6 +70,23 @@ async function expectStatus(response, status, label) {
   return response;
 }
 
+async function jsonRequest(baseUrl, route, options, status, label) {
+  const response = await expectStatus(await fetch(`${baseUrl}${route}`, options), status, label);
+  return response.json();
+}
+
+async function listItems(baseUrl) {
+  return jsonRequest(baseUrl, "/api/file-system", undefined, 200, "list");
+}
+
+function expectItem(items, predicate, label) {
+  const item = items.find(predicate);
+  if (!item) {
+    throw new Error(`${label} was not present in list output`);
+  }
+  return item;
+}
+
 const archivePath = await packageFiles(targetPlatform, serviceVersion);
 const expectedArchive = path.join(repoRoot, "dist", archiveName(targetPlatform));
 if (archivePath !== expectedArchive || !existsSync(expectedArchive)) {
@@ -108,31 +125,54 @@ try {
     throw new Error("ui asset response was unexpectedly small");
   }
 
-  const folderResponse = await expectStatus(
-    await fetch(`${baseUrl}/api/file-system/folder`, {
+  const docs = await jsonRequest(
+    baseUrl,
+    "/api/file-system/folder",
+    {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "docs", parentId: null }),
-    }),
+    },
     201,
     "create folder",
   );
-  const folder = await folderResponse.json();
+  const archive = await jsonRequest(
+    baseUrl,
+    "/api/file-system/folder",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "archive", parentId: null }),
+    },
+    201,
+    "create destination folder",
+  );
+  const nested = await jsonRequest(
+    baseUrl,
+    "/api/file-system/folder",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "nested", parentId: docs._id }),
+    },
+    201,
+    "create nested folder",
+  );
 
   const form = new FormData();
-  form.append("parentId", folder._id);
+  form.append("parentId", docs._id);
   form.append("file", new Blob(["hello files"], { type: "text/plain" }), "hello.txt");
-  const uploadResponse = await expectStatus(
-    await fetch(`${baseUrl}/api/file-system/upload`, { method: "POST", body: form }),
+  const uploaded = await jsonRequest(
+    baseUrl,
+    "/api/file-system/upload",
+    { method: "POST", body: form },
     201,
     "upload file",
   );
-  const uploaded = await uploadResponse.json();
 
-  const list = await (await expectStatus(await fetch(`${baseUrl}/api/file-system`), 200, "list")).json();
-  if (!list.some((item) => item._id === uploaded._id && item.parentId === folder._id)) {
-    throw new Error("uploaded file was not present in list output");
-  }
+  let list = await listItems(baseUrl);
+  expectItem(list, (item) => item._id === uploaded._id && item.parentId === docs._id, "uploaded file");
+  expectItem(list, (item) => item._id === nested._id && item.parentId === docs._id, "nested folder");
 
   const download = await expectStatus(
     await fetch(`${baseUrl}/api/file-system/download?files=${encodeURIComponent(uploaded._id)}`),
@@ -143,26 +183,97 @@ try {
     throw new Error("downloaded file content did not match upload");
   }
 
-  const rename = await expectStatus(
-    await fetch(`${baseUrl}/api/file-system/rename`, {
+  const rename = await jsonRequest(
+    baseUrl,
+    "/api/file-system/rename",
+    {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id: uploaded._id, newName: "renamed.txt" }),
-    }),
+    },
     200,
     "rename file",
   );
-  const renamed = (await rename.json()).item;
+  const renamed = rename.item;
+
+  await expectStatus(
+    await fetch(`${baseUrl}/api/file-system/move`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceIds: [renamed._id], destinationId: archive._id }),
+    }),
+    200,
+    "move file",
+  );
+  list = await listItems(baseUrl);
+  const movedFile = expectItem(
+    list,
+    (item) => item.name === "renamed.txt" && item.parentId === archive._id && item.path === "/archive/renamed.txt",
+    "moved file",
+  );
+  if (list.some((item) => item.path === "/docs/renamed.txt")) {
+    throw new Error("moved file was still present in source folder");
+  }
+
+  await expectStatus(
+    await fetch(`${baseUrl}/api/file-system/copy`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sourceIds: [nested._id], destinationId: archive._id }),
+    }),
+    200,
+    "copy folder",
+  );
+  list = await listItems(baseUrl);
+  expectItem(list, (item) => item.path === "/archive/nested" && item.isDirectory, "copied folder");
+
+  const renameFolder = await jsonRequest(
+    baseUrl,
+    "/api/file-system/rename",
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: docs._id, newName: "documents" }),
+    },
+    200,
+    "rename folder",
+  );
+  const renamedFolder = renameFolder.item;
+  list = await listItems(baseUrl);
+  expectItem(list, (item) => item._id === renamedFolder._id && item.path === "/documents", "renamed folder");
+
+  const movedDownload = await expectStatus(
+    await fetch(`${baseUrl}/api/file-system/download?files=${encodeURIComponent(movedFile._id)}`),
+    200,
+    "download moved file",
+  );
+  if ((await movedDownload.text()) !== "hello files") {
+    throw new Error("downloaded moved file content did not match upload");
+  }
+
+  await expectStatus(
+    await fetch(`${baseUrl}/api/file-system/folder`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "bad/name", parentId: null }),
+    }),
+    400,
+    "reject unsafe folder name",
+  );
 
   await expectStatus(
     await fetch(`${baseUrl}/api/file-system`, {
       method: "DELETE",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ids: [renamed._id, folder._id] }),
+      body: JSON.stringify({ ids: [archive._id, renamedFolder._id] }),
     }),
     200,
     "delete items",
   );
+  list = await listItems(baseUrl);
+  if (list.length > 0) {
+    throw new Error(`expected delete cleanup to empty data root, found ${list.length} item(s)`);
+  }
 
   await expectStatus(await fetch(`${baseUrl}/api/options?type=GET_FILE_MAXSIZE`, { method: "PUT" }), 200, "legacy options");
   console.log(`[lasso-files] verified package and API lifecycle on port ${verifyPort}`);

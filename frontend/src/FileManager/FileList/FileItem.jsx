@@ -189,6 +189,9 @@ const FileItem = ({
       className={`file-item-container ${dropZoneClass} ${
         fileSelected || !!file.isEditing ? "file-selected" : ""
       } ${isFileMoving ? "file-moving" : ""}`}
+      data-testid={`file-item-${file.name}`}
+      data-file-name={file.name}
+      data-file-path={file.path}
       tabIndex={0}
       title={file.name}
       onClick={handleFileSelection}

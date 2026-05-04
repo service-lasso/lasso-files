@@ -33,6 +33,7 @@ const Modal = ({
     <dialog
       ref={modalRef}
       className={`fm-modal dialog`}
+      data-testid="modal"
       style={{ width: dialogWidth }}
       onKeyDown={handleKeyDown}
     >
@@ -43,6 +44,7 @@ const Modal = ({
             size={18}
             onClick={() => setShow(false)}
             className="close-icon"
+            data-testid="modal-close"
             title={t("close")}
           />
         )}
