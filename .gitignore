@@ -3,4 +3,6 @@ output/
 build/
 node_modules/
 frontend/dist/
+playwright-report/
+test-results/
 *.log

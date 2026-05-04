@@ -115,6 +115,7 @@ const BreadCrumb = ({ collapsibleNav, isNavigationPaneOpen, setNavigationPaneOpe
           <div key={index} style={{ display: "contents" }}>
             <span
               className="folder-name"
+              data-testid={index === 0 ? "breadcrumb-home" : `breadcrumb-${folder.name}`}
               onClick={() => switchPath(folder.path)}
               ref={(el) => (foldersRef.current[index] = el)}
             >

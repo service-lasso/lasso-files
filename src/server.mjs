@@ -36,50 +36,54 @@ if (publicRoot) {
   app.use(express.static(publicRoot, { index: false }));
 }
 
-app.get("/healthcheck", async (_request, response) => {
+const asyncHandler = (handler) => (request, response, next) => {
+  Promise.resolve(handler(request, response, next)).catch(next);
+};
+
+app.get("/healthcheck", asyncHandler(async (_request, response) => {
   await store.ensureRoot();
   response.json({
     status: "ok",
     service: "files",
     dataRoot,
   });
-});
+}));
 
-app.get("/api/file-system", async (_request, response) => {
+app.get("/api/file-system", asyncHandler(async (_request, response) => {
   response.json(await store.list());
-});
+}));
 
-app.post("/api/file-system/folder", async (request, response) => {
+app.post("/api/file-system/folder", asyncHandler(async (request, response) => {
   response.status(201).json(await store.createFolder(request.body?.name, request.body?.parentId));
-});
+}));
 
-app.post("/api/file-system/upload", upload.single("file"), async (request, response) => {
+app.post("/api/file-system/upload", upload.single("file"), asyncHandler(async (request, response) => {
   response.status(201).json(await store.writeFile(request.file, request.body?.parentId));
-});
+}));
 
-app.post("/api/file-system/copy", async (request, response) => {
+app.post("/api/file-system/copy", asyncHandler(async (request, response) => {
   await store.copy(request.body?.sourceIds, request.body?.destinationId);
   response.json({ message: "Item(s) copied successfully!" });
-});
+}));
 
-app.put("/api/file-system/move", async (request, response) => {
+app.put("/api/file-system/move", asyncHandler(async (request, response) => {
   await store.move(request.body?.sourceIds, request.body?.destinationId);
   response.json({ message: "Item(s) moved successfully!" });
-});
+}));
 
-app.patch("/api/file-system/rename", async (request, response) => {
+app.patch("/api/file-system/rename", asyncHandler(async (request, response) => {
   const item = await store.rename(request.body?.id, request.body?.newName);
   response.json({ message: "File or Folder renamed successfully!", item });
-});
+}));
 
-app.delete("/api/file-system", async (request, response) => {
+app.delete("/api/file-system", asyncHandler(async (request, response) => {
   await store.delete(request.body?.ids);
   response.json({ message: "File(s) or Folder(s) deleted successfully." });
-});
+}));
 
-app.get("/api/file-system/download", async (request, response) => {
+app.get("/api/file-system/download", asyncHandler(async (request, response) => {
   await store.sendDownload(request.query.files, response);
-});
+}));
 
 app.use("/content", express.static(dataRoot, { fallthrough: false }));
 
@@ -122,7 +126,7 @@ app.put("/api/options", (request, response) => {
   response.status(400).send("Arg type error!");
 });
 
-app.get("/api/*", async (request, response) => {
+app.get("/api/*", asyncHandler(async (request, response) => {
   const relativePath = normalizeRelativePath(request.params[0] || "");
   const absolute = store.resolve(relativePath);
   const stats = await stat(absolute);
@@ -131,15 +135,15 @@ app.get("/api/*", async (request, response) => {
     return;
   }
   response.download(absolute, path.basename(relativePath));
-});
+}));
 
-app.delete("/api/*", async (request, response) => {
+app.delete("/api/*", asyncHandler(async (request, response) => {
   const relativePath = normalizeRelativePath(request.params[0] || "");
   await store.delete([Buffer.from(relativePath, "utf8").toString("base64url")]);
   response.send("Deleting successful!");
-});
+}));
 
-app.post("/api/*", upload.single("file"), async (request, response) => {
+app.post("/api/*", upload.single("file"), asyncHandler(async (request, response) => {
   const relativePath = normalizeRelativePath(request.params[0] || "");
   const type = request.query.type;
   if (type === "CREATE_FOLDER") {
@@ -152,7 +156,7 @@ app.post("/api/*", upload.single("file"), async (request, response) => {
   }
 
   response.status(400).send("Arg type error!");
-});
+}));
 
 app.use((error, _request, response, _next) => {
   const status = error.status || error.statusCode || 500;
