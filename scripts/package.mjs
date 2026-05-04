@@ -108,8 +108,6 @@ export async function packageFiles(platform = targetPlatform, version = serviceV
       {
         serviceId: "files",
         upstream: {
-          backendContract: "TypeRefinery services/files",
-          frontendSource: "C:/projects/github/react-file-manager/frontend",
           version,
         },
         packagedBy: "service-lasso/lasso-files",
