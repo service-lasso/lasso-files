@@ -1,5 +1,5 @@
-@import "@fontsource/nunito-sans";
-@import "../styles/variables";
+@use "@fontsource/nunito-sans";
+@use "../styles/variables" as *;
 
 .text-white {
   color: white;
