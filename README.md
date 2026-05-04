@@ -37,10 +37,7 @@ Use this direct mode when developing or quickly checking the service without a S
 
 ```powershell
 npm ci
-npm run build:ui
-$env:FILES_PORT = "8199"
-$env:FILES_DATA_PATH = "$PWD\data"
-node .\src\server.mjs
+npm run dev
 ```
 
 Open the UI:
@@ -55,7 +52,17 @@ Check health:
 Invoke-RestMethod http://127.0.0.1:8199/healthcheck
 ```
 
-Direct mode uses the same server entry point that the packaged service uses. `FILES_DATA_PATH` controls where uploaded and managed files are stored.
+`npm run dev` builds the React UI and starts the same server entry point that the packaged service uses. By default it uses port `8199` and stores files under `./data`.
+
+Override defaults when needed:
+
+```powershell
+$env:FILES_PORT = "18200"
+$env:FILES_DATA_PATH = "D:\tmp\lasso-files-data"
+npm run dev
+```
+
+If the UI has already been built, use `npm start` to start the server without rebuilding.
 
 ## Run With Service Lasso
 
