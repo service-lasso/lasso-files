@@ -11,6 +11,7 @@ Release-backed Service Lasso file manager service.
 - Default port: `8199`
 - Data root: `${SERVICE_DATA_PATH}` or `FILES_DATA_PATH`
 - Allowed upload extensions: `FILES_ALLOWED_EXTENSIONS`
+- Blocked upload extensions: `FILES_BLOCKED_EXTENSIONS`
 - Max upload size: `FILES_MAXSIZE_MB`
 - Healthcheck: `GET /healthcheck` returns `200`
 - Global environment exported to dependants:
@@ -62,6 +63,7 @@ Override defaults when needed:
 $env:FILES_PORT = "18200"
 $env:FILES_DATA_PATH = "D:\tmp\lasso-files-data"
 $env:FILES_ALLOWED_EXTENSIONS = ".txt,.pdf,.png"
+$env:FILES_BLOCKED_EXTENSIONS = ""
 $env:FILES_MAXSIZE_MB = "300"
 npm run dev
 ```
@@ -79,16 +81,19 @@ $env:FILES_ALLOWED_EXTENSIONS = ".txt,.pdf,.png"
 npm run dev
 ```
 
-Use `*` to allow every extension:
+Use `*` to allow every extension. Add blocked extensions to deny high-risk types while keeping the rest open:
 
 ```powershell
 $env:FILES_ALLOWED_EXTENSIONS = "*"
+$env:FILES_BLOCKED_EXTENSIONS = ".exe,.bat,.cmd,.ps1"
 ```
+
+Blocked extensions always win. For example, if `.exe` appears in both `FILES_ALLOWED_EXTENSIONS` and `FILES_BLOCKED_EXTENSIONS`, uploads ending in `.exe` are rejected.
 
 Runtime config API:
 
-- `GET /api/config` returns `allowedExtensions`, `acceptedFileTypes`, `allowAllFiles`, `maxUploadBytes`, and `maxUploadMb`.
-- `PUT /api/config` or `PATCH /api/config` with `{ "allowedExtensions": [".txt", ".pdf"] }` updates the in-memory allowed extension list.
+- `GET /api/config` returns `allowedExtensions`, `blockedExtensions`, `acceptedFileTypes`, `blockedFileTypes`, `allowAllFiles`, `maxUploadBytes`, and `maxUploadMb`.
+- `PUT /api/config` or `PATCH /api/config` with `{ "allowedExtensions": [".txt", ".pdf"], "blockedExtensions": [".exe"] }` updates the in-memory extension rules.
 - The runtime update is intentionally not persisted; restart-time config still comes from environment/service manifest values.
 
 ## Run With Service Lasso

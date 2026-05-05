@@ -50,6 +50,7 @@
       "FILES_URL": "http://127.0.0.1:${SERVICE_PORT}",
       "FILES_DATA_PATH": "${SERVICE_DATA_PATH}",
       "FILES_ALLOWED_EXTENSIONS": ".txt,.png,.jpg,.jpeg,.pdf,.doc,.docx,.exe",
+      "FILES_BLOCKED_EXTENSIONS": "",
       "FILES_MAXSIZE_MB": "300"
     },
     "globalenv": {

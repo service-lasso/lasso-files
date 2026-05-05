@@ -35,14 +35,23 @@ Items use deterministic path-derived ids. The root folder id is `root`; child id
 | `PUT` | `/api/config` | `{ "allowedExtensions": [".txt", ".pdf"] }` | Replace the in-memory allowed extension list |
 | `PATCH` | `/api/config` | `{ "acceptedFileTypes": ".txt,.pdf" }` | Replace the in-memory allowed extension list |
 
-The allowed extension list is also loaded from `FILES_ALLOWED_EXTENSIONS` at startup. Use `*` to allow every extension. Runtime API updates are not persisted across restarts.
+The allowed extension list is loaded from `FILES_ALLOWED_EXTENSIONS` at startup. The blocked extension list is loaded from `FILES_BLOCKED_EXTENSIONS`. Use `*` for `FILES_ALLOWED_EXTENSIONS` to allow every extension, then set `FILES_BLOCKED_EXTENSIONS` to deny specific extensions. Blocked extensions always win over allowed extensions. Runtime API updates are not persisted across restarts.
+
+Allow all except executable/script files:
+
+```powershell
+$env:FILES_ALLOWED_EXTENSIONS = "*"
+$env:FILES_BLOCKED_EXTENSIONS = ".exe,.bat,.cmd,.ps1"
+```
 
 Example response:
 
 ```json
 {
   "allowedExtensions": [".txt", ".pdf"],
+  "blockedExtensions": [".exe"],
   "acceptedFileTypes": ".txt, .pdf",
+  "blockedFileTypes": ".exe",
   "allowAllFiles": false,
   "maxUploadBytes": 314572800,
   "maxUploadMb": 300
