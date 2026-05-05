@@ -10,6 +10,8 @@ Release-backed Service Lasso file manager service.
 - Runtime dependency: `@node`
 - Default port: `8199`
 - Data root: `${SERVICE_DATA_PATH}` or `FILES_DATA_PATH`
+- Allowed upload extensions: `FILES_ALLOWED_EXTENSIONS`
+- Max upload size: `FILES_MAXSIZE_MB`
 - Healthcheck: `GET /healthcheck` returns `200`
 - Global environment exported to dependants:
   - `FILES_URL=http://127.0.0.1:${SERVICE_PORT}`
@@ -59,10 +61,35 @@ Override defaults when needed:
 ```powershell
 $env:FILES_PORT = "18200"
 $env:FILES_DATA_PATH = "D:\tmp\lasso-files-data"
+$env:FILES_ALLOWED_EXTENSIONS = ".txt,.pdf,.png"
+$env:FILES_MAXSIZE_MB = "300"
 npm run dev
 ```
 
 If the UI has already been built, use `npm start` to start the server without rebuilding.
+
+## Allowed Files
+
+Allowed uploads are configured by extension and enforced by the server. The React UI reads the same setting from the service config API, so the file picker and backend stay aligned.
+
+Set allowed file extensions at startup:
+
+```powershell
+$env:FILES_ALLOWED_EXTENSIONS = ".txt,.pdf,.png"
+npm run dev
+```
+
+Use `*` to allow every extension:
+
+```powershell
+$env:FILES_ALLOWED_EXTENSIONS = "*"
+```
+
+Runtime config API:
+
+- `GET /api/config` returns `allowedExtensions`, `acceptedFileTypes`, `allowAllFiles`, `maxUploadBytes`, and `maxUploadMb`.
+- `PUT /api/config` or `PATCH /api/config` with `{ "allowedExtensions": [".txt", ".pdf"] }` updates the in-memory allowed extension list.
+- The runtime update is intentionally not persisted; restart-time config still comes from environment/service manifest values.
 
 ## Run With Service Lasso
 

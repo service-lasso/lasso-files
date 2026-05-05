@@ -5,6 +5,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { stat } from "node:fs/promises";
+import { createFilesConfig } from "./files-config.mjs";
 import { FileStore } from "./file-store.mjs";
 import { normalizeRelativePath } from "./path-ids.mjs";
 
@@ -17,13 +18,23 @@ const dataRoot = path.resolve(
   process.env.FILES_DATA_PATH || process.env.SERVICE_DATA_PATH || path.join(packageRoot, "data"),
 );
 const port = Number(process.env.SERVICE_PORT || process.env.FILES_PORT || process.env.PORT || 8199);
-const maxUploadMb = Number(process.env.FILES_MAXSIZE_MB || process.env.FM_MAXSIZE || 300);
+const filesConfig = createFilesConfig();
 
 const store = new FileStore(dataRoot);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: maxUploadMb * 1024 * 1024,
+    fileSize: filesConfig.maxUploadBytes,
+  },
+  fileFilter: (_request, file, callback) => {
+    if (filesConfig.isAllowed(file.originalname)) {
+      callback(null, true);
+      return;
+    }
+
+    const error = new Error(`File type is not allowed: ${path.extname(file.originalname) || file.originalname}`);
+    error.status = 400;
+    callback(error);
   },
 });
 
@@ -52,6 +63,28 @@ app.get("/healthcheck", asyncHandler(async (_request, response) => {
 app.get("/api/file-system", asyncHandler(async (_request, response) => {
   response.json(await store.list());
 }));
+
+app.get("/api/config", (_request, response) => {
+  response.json(filesConfig.toJSON());
+});
+
+app.patch("/api/config", (request, response) => {
+  if (!Object.hasOwn(request.body ?? {}, "allowedExtensions") && !Object.hasOwn(request.body ?? {}, "acceptedFileTypes")) {
+    response.status(400).json({ error: "allowedExtensions or acceptedFileTypes is required." });
+    return;
+  }
+
+  response.json(filesConfig.updateAllowedExtensions(request.body.allowedExtensions ?? request.body.acceptedFileTypes));
+});
+
+app.put("/api/config", (request, response) => {
+  if (!Object.hasOwn(request.body ?? {}, "allowedExtensions") && !Object.hasOwn(request.body ?? {}, "acceptedFileTypes")) {
+    response.status(400).json({ error: "allowedExtensions or acceptedFileTypes is required." });
+    return;
+  }
+
+  response.json(filesConfig.updateAllowedExtensions(request.body.allowedExtensions ?? request.body.acceptedFileTypes));
+});
 
 app.post("/api/file-system/folder", asyncHandler(async (request, response) => {
   response.status(201).json(await store.createFolder(request.body?.name, request.body?.parentId));
@@ -116,11 +149,11 @@ app.put("/api/options", (request, response) => {
     return;
   }
   if (type === "GET_FILE_FILTER") {
-    response.json({ file: process.env.FILES_FILTER || "", mime: process.env.FILES_MIMEFILTER || "" });
+    response.json({ file: filesConfig.acceptedFileTypes(), mime: process.env.FILES_MIMEFILTER || "" });
     return;
   }
   if (type === "GET_FILE_MAXSIZE") {
-    response.json(maxUploadMb * 1024 * 1024);
+    response.json(filesConfig.maxUploadBytes);
     return;
   }
   response.status(400).send("Arg type error!");

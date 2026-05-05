@@ -125,6 +125,34 @@ try {
     throw new Error("ui asset response was unexpectedly small");
   }
 
+  const config = await jsonRequest(baseUrl, "/api/config", undefined, 200, "get config");
+  if (!config.acceptedFileTypes.includes(".pdf") || config.maxUploadBytes !== 300 * 1024 * 1024) {
+    throw new Error(`unexpected config response: ${JSON.stringify(config)}`);
+  }
+
+  const updatedConfig = await jsonRequest(
+    baseUrl,
+    "/api/config",
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ allowedExtensions: ["txt", ".pdf"] }),
+    },
+    200,
+    "update allowed file config",
+  );
+  if (updatedConfig.acceptedFileTypes !== ".txt, .pdf") {
+    throw new Error(`allowed extensions were not normalized: ${JSON.stringify(updatedConfig)}`);
+  }
+
+  const blockedForm = new FormData();
+  blockedForm.append("file", new Blob(["blocked"], { type: "application/octet-stream" }), "blocked.exe");
+  await expectStatus(
+    await fetch(`${baseUrl}/api/file-system/upload`, { method: "POST", body: blockedForm }),
+    400,
+    "reject disallowed upload",
+  );
+
   const docs = await jsonRequest(
     baseUrl,
     "/api/file-system/folder",

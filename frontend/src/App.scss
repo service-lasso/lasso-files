@@ -1,16 +1,22 @@
-body {
+html,
+body,
+#root {
+  height: 100%;
   margin: 0;
 }
 
 .app {
-  height: 100dvh;
+  min-height: 100dvh;
+  width: 100%;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  align-items: stretch;
   background-color: #32363a;
+  box-sizing: border-box;
+  padding: 12px;
 
   .file-manager-container {
-    height: 70%;
-    width: 67%;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
   }
 }

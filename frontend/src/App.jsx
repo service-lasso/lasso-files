@@ -9,7 +9,10 @@ import "./App.scss";
 import FileManager from "./FileManager/FileManager";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/file-system";
+const CONFIG_URL = import.meta.env.VITE_API_CONFIG_URL || "/api/config";
 const FILE_PREVIEW_BASE_URL = import.meta.env.VITE_API_FILES_BASE_URL || "/content";
+const DEFAULT_ACCEPTED_FILE_TYPES = ".txt, .png, .jpg, .jpeg, .pdf, .doc, .docx, .exe";
+const DEFAULT_MAX_FILE_SIZE = 300 * 1024 * 1024;
 
 function App() {
   const fileUploadConfig = {
@@ -18,6 +21,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [files, setFiles] = useState([]);
   const [currentPath, setCurrentPath] = useState("");
+  const [acceptedFileTypes, setAcceptedFileTypes] = useState(DEFAULT_ACCEPTED_FILE_TYPES);
+  const [maxFileSize, setMaxFileSize] = useState(DEFAULT_MAX_FILE_SIZE);
   const isMountRef = useRef(false);
 
   // Get Files
@@ -36,9 +41,22 @@ function App() {
   useEffect(() => {
     if (isMountRef.current) return;
     isMountRef.current = true;
+    getConfig();
     getFiles();
   }, []);
   //
+
+  const getConfig = async () => {
+    try {
+      const response = await fetch(CONFIG_URL);
+      if (!response.ok) return;
+      const config = await response.json();
+      setAcceptedFileTypes(config.acceptedFileTypes || "");
+      setMaxFileSize(config.maxUploadBytes || DEFAULT_MAX_FILE_SIZE);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   // Create Folder
   const handleCreateFolder = async (name, parentFolder) => {
@@ -161,9 +179,9 @@ function App() {
           onError={handleError}
           layout="grid"
           enableFilePreview
-          maxFileSize={10485760}
+          maxFileSize={maxFileSize}
           filePreviewPath={FILE_PREVIEW_BASE_URL}
-          acceptedFileTypes=".txt, .png, .jpg, .jpeg, .pdf, .doc, .docx, .exe"
+          acceptedFileTypes={acceptedFileTypes}
           height="100%"
           width="100%"
           initialPath={currentPath}
