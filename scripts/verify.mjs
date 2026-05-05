@@ -126,7 +126,7 @@ try {
   }
 
   const config = await jsonRequest(baseUrl, "/api/config", undefined, 200, "get config");
-  if (!config.acceptedFileTypes.includes(".pdf") || config.maxUploadBytes !== 300 * 1024 * 1024) {
+  if (!config.acceptedFileTypes.includes(".pdf") || config.blockedFileTypes !== "" || config.maxUploadBytes !== 300 * 1024 * 1024) {
     throw new Error(`unexpected config response: ${JSON.stringify(config)}`);
   }
 
@@ -136,12 +136,12 @@ try {
     {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ allowedExtensions: ["txt", ".pdf"] }),
+      body: JSON.stringify({ allowedExtensions: ["txt", ".pdf"], blockedExtensions: [] }),
     },
     200,
     "update allowed file config",
   );
-  if (updatedConfig.acceptedFileTypes !== ".txt, .pdf") {
+  if (updatedConfig.acceptedFileTypes !== ".txt, .pdf" || updatedConfig.blockedFileTypes !== "") {
     throw new Error(`allowed extensions were not normalized: ${JSON.stringify(updatedConfig)}`);
   }
 
@@ -151,6 +151,39 @@ try {
     await fetch(`${baseUrl}/api/file-system/upload`, { method: "POST", body: blockedForm }),
     400,
     "reject disallowed upload",
+  );
+
+  const allowAllExceptExeConfig = await jsonRequest(
+    baseUrl,
+    "/api/config",
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ allowedExtensions: "*", blockedExtensions: ["exe", ".bat"] }),
+    },
+    200,
+    "update blocked file config",
+  );
+  if (!allowAllExceptExeConfig.allowAllFiles || allowAllExceptExeConfig.blockedFileTypes !== ".exe, .bat") {
+    throw new Error(`blocked extensions were not normalized: ${JSON.stringify(allowAllExceptExeConfig)}`);
+  }
+
+  const blockedByDenyListForm = new FormData();
+  blockedByDenyListForm.append("file", new Blob(["blocked"], { type: "application/octet-stream" }), "blocked.exe");
+  await expectStatus(
+    await fetch(`${baseUrl}/api/file-system/upload`, { method: "POST", body: blockedByDenyListForm }),
+    400,
+    "reject blocked upload when allow all",
+  );
+
+  const allowedByWildcardForm = new FormData();
+  allowedByWildcardForm.append("file", new Blob(["allowed"], { type: "application/octet-stream" }), "allowed.customtype");
+  const wildcardUpload = await jsonRequest(
+    baseUrl,
+    "/api/file-system/upload",
+    { method: "POST", body: allowedByWildcardForm },
+    201,
+    "allow wildcard upload",
   );
 
   const docs = await jsonRequest(
@@ -199,6 +232,7 @@ try {
   );
 
   let list = await listItems(baseUrl);
+  expectItem(list, (item) => item._id === wildcardUpload._id && item.name === "allowed.customtype", "wildcard upload");
   expectItem(list, (item) => item._id === uploaded._id && item.parentId === docs._id, "uploaded file");
   expectItem(list, (item) => item._id === nested._id && item.parentId === docs._id, "nested folder");
 
@@ -293,7 +327,7 @@ try {
     await fetch(`${baseUrl}/api/file-system`, {
       method: "DELETE",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ids: [archive._id, renamedFolder._id] }),
+      body: JSON.stringify({ ids: [archive._id, renamedFolder._id, wildcardUpload._id] }),
     }),
     200,
     "delete items",

@@ -6,6 +6,7 @@ export function createFilesConfig(env = process.env) {
     allowedExtensions: parseAllowedExtensions(
       env.FILES_ALLOWED_EXTENSIONS ?? env.FILES_ACCEPTED_FILE_TYPES ?? DEFAULT_ALLOWED_EXTENSIONS.join(","),
     ),
+    blockedExtensions: parseAllowedExtensions(env.FILES_BLOCKED_EXTENSIONS ?? ""),
     maxUploadMb: parsePositiveNumber(env.FILES_MAXSIZE_MB ?? env.FM_MAXSIZE, DEFAULT_MAX_UPLOAD_MB),
   };
 
@@ -25,21 +26,42 @@ export function createFilesConfig(env = process.env) {
     allowedExtensions() {
       return [...state.allowedExtensions];
     },
+    blockedExtensions() {
+      return [...state.blockedExtensions];
+    },
     updateAllowedExtensions(value) {
       state.allowedExtensions = parseAllowedExtensions(value);
       return this.toJSON();
     },
+    updateBlockedExtensions(value) {
+      state.blockedExtensions = parseAllowedExtensions(value);
+      return this.toJSON();
+    },
+    update(value = {}) {
+      if (Object.hasOwn(value, "allowedExtensions") || Object.hasOwn(value, "acceptedFileTypes")) {
+        state.allowedExtensions = parseAllowedExtensions(value.allowedExtensions ?? value.acceptedFileTypes);
+      }
+      if (Object.hasOwn(value, "blockedExtensions") || Object.hasOwn(value, "blockedFileTypes")) {
+        state.blockedExtensions = parseAllowedExtensions(value.blockedExtensions ?? value.blockedFileTypes);
+      }
+      return this.toJSON();
+    },
     isAllowed(filename) {
+      const extension = extensionFromName(filename);
+      if (state.blockedExtensions.includes(extension)) {
+        return false;
+      }
       if (state.allowedExtensions.length === 0) {
         return true;
       }
-      const extension = extensionFromName(filename);
       return state.allowedExtensions.includes(extension);
     },
     toJSON() {
       return {
         allowedExtensions: [...state.allowedExtensions],
+        blockedExtensions: [...state.blockedExtensions],
         acceptedFileTypes: state.allowedExtensions.join(", "),
+        blockedFileTypes: state.blockedExtensions.join(", "),
         allowAllFiles: state.allowedExtensions.length === 0,
         maxUploadBytes: state.maxUploadMb * 1024 * 1024,
         maxUploadMb: state.maxUploadMb,

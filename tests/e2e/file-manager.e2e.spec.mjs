@@ -59,6 +59,22 @@ test("file manager UI uses server allowed file config", async ({ page }) => {
   await expect(page.getByTestId("file-item-blocked.pdf")).toHaveCount(0);
 });
 
+test("file manager UI allows wildcard uploads but reports blocked extensions", async ({ page }) => {
+  await page.request.put("/api/config", {
+    data: { allowedExtensions: "*", blockedExtensions: [".pdf"] },
+  });
+  await page.goto("/files");
+  await page.getByTestId("toolbar-upload").click();
+  await page.locator("#chooseFile").setInputFiles({
+    name: "blocked-by-deny-list.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4"),
+  });
+
+  await expect(page.getByText("Upload failed.")).toBeVisible();
+  await expect(page.getByTestId("file-item-blocked-by-deny-list.pdf")).toHaveCount(0);
+});
+
 async function expectFileManagerToFillViewport(page) {
   const viewport = page.viewportSize();
   const box = await page.getByTestId("file-manager").boundingBox();

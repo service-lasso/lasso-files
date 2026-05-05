@@ -69,21 +69,21 @@ app.get("/api/config", (_request, response) => {
 });
 
 app.patch("/api/config", (request, response) => {
-  if (!Object.hasOwn(request.body ?? {}, "allowedExtensions") && !Object.hasOwn(request.body ?? {}, "acceptedFileTypes")) {
-    response.status(400).json({ error: "allowedExtensions or acceptedFileTypes is required." });
+  if (!hasConfigUpdate(request.body)) {
+    response.status(400).json({ error: "allowedExtensions, acceptedFileTypes, blockedExtensions, or blockedFileTypes is required." });
     return;
   }
 
-  response.json(filesConfig.updateAllowedExtensions(request.body.allowedExtensions ?? request.body.acceptedFileTypes));
+  response.json(filesConfig.update(request.body));
 });
 
 app.put("/api/config", (request, response) => {
-  if (!Object.hasOwn(request.body ?? {}, "allowedExtensions") && !Object.hasOwn(request.body ?? {}, "acceptedFileTypes")) {
-    response.status(400).json({ error: "allowedExtensions or acceptedFileTypes is required." });
+  if (!hasConfigUpdate(request.body)) {
+    response.status(400).json({ error: "allowedExtensions, acceptedFileTypes, blockedExtensions, or blockedFileTypes is required." });
     return;
   }
 
-  response.json(filesConfig.updateAllowedExtensions(request.body.allowedExtensions ?? request.body.acceptedFileTypes));
+  response.json(filesConfig.update(request.body));
 });
 
 app.post("/api/file-system/folder", asyncHandler(async (request, response) => {
@@ -207,3 +207,9 @@ function stop() {
 
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
+
+function hasConfigUpdate(body = {}) {
+  return ["allowedExtensions", "acceptedFileTypes", "blockedExtensions", "blockedFileTypes"].some((key) =>
+    Object.hasOwn(body, key),
+  );
+}
