@@ -27,6 +27,28 @@ Base path: `/api/file-system`
 
 Items use deterministic path-derived ids. The root folder id is `root`; child ids are stable while the path is stable.
 
+## Service Config API
+
+| Method | URL | Body/query | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/config` | none | Read upload limits and allowed extensions used by the UI and backend |
+| `PUT` | `/api/config` | `{ "allowedExtensions": [".txt", ".pdf"] }` | Replace the in-memory allowed extension list |
+| `PATCH` | `/api/config` | `{ "acceptedFileTypes": ".txt,.pdf" }` | Replace the in-memory allowed extension list |
+
+The allowed extension list is also loaded from `FILES_ALLOWED_EXTENSIONS` at startup. Use `*` to allow every extension. Runtime API updates are not persisted across restarts.
+
+Example response:
+
+```json
+{
+  "allowedExtensions": [".txt", ".pdf"],
+  "acceptedFileTypes": ".txt, .pdf",
+  "allowAllFiles": false,
+  "maxUploadBytes": 314572800,
+  "maxUploadMb": 300
+}
+```
+
 ## Item Shape
 
 ```json

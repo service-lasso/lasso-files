@@ -4,8 +4,12 @@ import os from "node:os";
 import path from "node:path";
 
 test("file manager UI supports core folder and file operations", async ({ page }) => {
+  await page.request.put("/api/config", {
+    data: { acceptedFileTypes: ".txt, .png, .jpg, .jpeg, .pdf, .doc, .docx, .exe" },
+  });
   await page.goto("/files");
   await expect(page.getByTestId("file-manager")).toBeVisible();
+  await expectFileManagerToFillViewport(page);
   await expect(page.getByText("This folder is empty.")).toBeVisible();
 
   await createFolder(page, "Projects");
@@ -38,6 +42,30 @@ test("file manager UI supports core folder and file operations", async ({ page }
   await deleteSelectedItem(page, "Inbox");
   await expect(page.getByText("This folder is empty.")).toBeVisible();
 });
+
+test("file manager UI uses server allowed file config", async ({ page }) => {
+  await page.request.put("/api/config", {
+    data: { allowedExtensions: [".txt"] },
+  });
+  await page.goto("/files");
+  await page.getByTestId("toolbar-upload").click();
+  await page.locator("#chooseFile").setInputFiles({
+    name: "blocked.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4"),
+  });
+
+  await expect(page.getByText("File type is not allowed.")).toBeVisible();
+  await expect(page.getByTestId("file-item-blocked.pdf")).toHaveCount(0);
+});
+
+async function expectFileManagerToFillViewport(page) {
+  const viewport = page.viewportSize();
+  const box = await page.getByTestId("file-manager").boundingBox();
+  expect(box).not.toBeNull();
+  expect(box.width).toBeGreaterThan(viewport.width * 0.9);
+  expect(box.height).toBeGreaterThan(viewport.height * 0.9);
+}
 
 async function createFolder(page, name) {
   await page.getByTestId("toolbar-new-folder").click();
