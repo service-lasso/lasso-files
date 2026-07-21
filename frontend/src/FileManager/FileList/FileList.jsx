@@ -19,7 +19,7 @@ const FileList = ({
   permissions,
   formatDate,
 }) => {
-  const { currentPathFiles, sortConfig, setSortConfig } = useFileNavigation();
+  const { currentPathFiles, selectedSource, sortConfig, setSortConfig } = useFileNavigation();
   const filesViewRef = useRef(null);
   const { activeLayout } = useLayout();
   const t = useTranslation();
@@ -80,6 +80,11 @@ const FileList = ({
             />
           ))}
         </>
+      ) : selectedSource?.status && selectedSource.status !== "ok" ? (
+        <div className="empty-folder source-state" data-testid="source-state">
+          <strong>{t("sourceUnavailable")}</strong>
+          {selectedSource.error && <span>{selectedSource.error}</span>}
+        </div>
       ) : (
         <div className="empty-folder">{t("folderEmpty")}</div>
       )}

@@ -22,10 +22,17 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
 
   const { clipBoard, setClipBoard, handleCutCopy, handlePasting } = useClipBoard();
   const { selectedFiles, setSelectedFiles, handleDownload } = useSelection();
-  const { currentPath, setCurrentPath, currentPathFiles, setCurrentPathFiles, onFolderChange } =
-    useFileNavigation();
+  const {
+    currentPath,
+    setCurrentPath,
+    currentPathFiles,
+    setCurrentPathFiles,
+    onFolderChange,
+    canMutateInCurrentLocation,
+  } = useFileNavigation();
   const { activeLayout, setActiveLayout } = useLayout();
   const t = useTranslation();
+  const hasReadOnlySelection = selectedFiles.some((file) => file.readOnly || file.virtual);
 
   // Context Menu
   const handleFileOpen = () => {
@@ -47,6 +54,7 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
   };
 
   const handleFilePasting = () => {
+    if (!canPasteTo(lastSelectedFile)) return;
     handlePasting(lastSelectedFile);
     setVisible(false);
   };
@@ -73,11 +81,13 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
   };
 
   const handleCreateNewFolder = () => {
+    if (!canMutateInCurrentLocation) return;
     triggerAction.show("createFolder");
     setVisible(false);
   };
 
   const handleUpload = () => {
+    if (!canMutateInCurrentLocation) return;
     setVisible(false);
     triggerAction.show("uploadFile");
   };
@@ -123,7 +133,7 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
       title: t("newFolder"),
       icon: <BsFolderPlus size={18} />,
       onClick: handleCreateNewFolder,
-      hidden: !permissions.create,
+      hidden: !permissions.create || !canMutateInCurrentLocation,
       divider: !permissions.upload,
     },
     {
@@ -131,7 +141,7 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
       icon: <MdOutlineFileUpload size={18} />,
       onClick: handleUpload,
       divider: true,
-      hidden: !permissions.upload,
+      hidden: !permissions.upload || !canMutateInCurrentLocation,
     },
     {
       title: t("selectAll"),
@@ -152,7 +162,7 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
       icon: <BsScissors size={19} />,
       onClick: () => handleMoveOrCopyItems(true),
       divider: !lastSelectedFile?.isDirectory && !permissions.copy,
-      hidden: !permissions.move,
+      hidden: !permissions.move || hasReadOnlySelection,
     },
     {
       title: t("copy"),
@@ -166,14 +176,14 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
       icon: <FaRegPaste size={18} />,
       onClick: handleFilePasting,
       className: `${clipBoard ? "" : "disable-paste"}`,
-      hidden: !lastSelectedFile?.isDirectory || (!permissions.move && !permissions.copy),
+      hidden: !lastSelectedFile?.isDirectory || !canPasteTo(lastSelectedFile) || (!permissions.move && !permissions.copy),
       divider: true,
     },
     {
       title: t("rename"),
       icon: <BiRename size={19} />,
       onClick: handleRenaming,
-      hidden: selectedFiles.length > 1 || !permissions.rename,
+      hidden: selectedFiles.length > 1 || !permissions.rename || hasReadOnlySelection,
     },
     {
       title: t("download"),
@@ -185,12 +195,17 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
       title: t("delete"),
       icon: <MdOutlineDelete size={19} />,
       onClick: handleDelete,
-      hidden: !permissions.delete,
+      hidden: !permissions.delete || hasReadOnlySelection,
     },
   ];
   //
 
   const handleFolderCreating = () => {
+    if (!canMutateInCurrentLocation) {
+      triggerAction.close();
+      return;
+    }
+
     setCurrentPathFiles((prev) => {
       return [
         ...prev,
@@ -206,6 +221,11 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
   };
 
   const handleItemRenaming = () => {
+    if (hasReadOnlySelection) {
+      triggerAction.close();
+      return;
+    }
+
     setCurrentPathFiles((prev) => {
       const lastFileIndex = selectedFileIndexes.at(-1);
 
@@ -285,6 +305,10 @@ const useFileList = (onRefresh, enableFilePreview, triggerAction, permissions, o
     clickPosition,
     isSelectionCtx,
   };
+
+  function canPasteTo(folder) {
+    return Boolean(clipBoard && folder?.isDirectory && !folder?.readOnly);
+  }
 };
 
 export default useFileList;

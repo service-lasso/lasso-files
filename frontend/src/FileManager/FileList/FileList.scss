@@ -114,6 +114,28 @@
     .file-name {
       max-width: 115px;
     }
+
+    .file-mode-badge {
+      max-width: 100px;
+      border: 1px solid $border-color;
+      border-radius: 999px;
+      font-size: 10px;
+      line-height: 1;
+      padding: 3px 6px;
+      white-space: nowrap;
+    }
+
+    .file-mode-badge.read-only {
+      color: #7c2d12;
+      background: #fff7ed;
+      border-color: #fed7aa;
+    }
+
+    .file-mode-badge.read-write {
+      color: #14532d;
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+    }
   }
 
   .file-selected {
@@ -245,6 +267,10 @@
     .file-name {
       max-width: 285px;
     }
+
+    .file-mode-badge {
+      margin-left: auto;
+    }
   }
 
   .modified-date {
@@ -266,8 +292,20 @@
 
 .empty-folder {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
   justify-content: center;
   align-items: center;
   width: 100%;
   height: 100%;
+}
+
+.source-state {
+  color: #7c2d12;
+  text-align: center;
+
+  span {
+    max-width: 420px;
+    color: #555;
+  }
 }

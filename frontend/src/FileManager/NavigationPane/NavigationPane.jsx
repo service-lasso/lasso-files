@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import FolderTree from "./FolderTree";
 import { getParentPath } from "../../utils/getParentPath";
-import { useFiles } from "../../contexts/FilesContext";
+import { useFileNavigation } from "../../contexts/FileNavigationContext";
 import { useTranslation } from "../../contexts/TranslationProvider";
 import "./NavigationPane.scss";
 
 const NavigationPane = ({ onFileOpen }) => {
   const [foldersTree, setFoldersTree] = useState([]);
-  const { files } = useFiles();
+  const { activeFiles } = useFileNavigation();
   const t = useTranslation();
 
   const createChildRecursive = (path, foldersStruct) => {
@@ -22,8 +22,8 @@ const NavigationPane = ({ onFileOpen }) => {
   };
 
   useEffect(() => {
-    if (Array.isArray(files)) {
-      const folders = files.filter((file) => file.isDirectory);
+    if (Array.isArray(activeFiles)) {
+      const folders = activeFiles.filter((file) => file.isDirectory);
       // Grouping folders by parent path
       const foldersStruct = Object.groupBy(folders, ({ path }) => getParentPath(path));
       setFoldersTree(() => {
@@ -31,7 +31,7 @@ const NavigationPane = ({ onFileOpen }) => {
         return createChildRecursive(rootPath, foldersStruct);
       });
     }
-  }, [files]);
+  }, [activeFiles]);
 
   return (
     <div className="sb-folders-list">
