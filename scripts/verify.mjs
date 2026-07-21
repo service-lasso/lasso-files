@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { packageFiles } from "./package.mjs";
@@ -9,6 +9,26 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const serviceVersion = process.env.FILES_SERVICE_VERSION ?? "1.0.0";
 const targetPlatform = process.env.TARGET_PLATFORM ?? process.platform;
 const verifyPort = Number(process.env.VERIFY_PORT ?? 18199);
+
+async function verifyServiceManifest() {
+  const manifestPath = path.join(repoRoot, "service.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const endpointIds = new Set((manifest.endpoints ?? []).map((endpoint) => endpoint.id));
+  for (const requiredEndpoint of ["web", "base_url", "ui", "health"]) {
+    if (!endpointIds.has(requiredEndpoint)) {
+      throw new Error(`service.json missing required endpoint: ${requiredEndpoint}`);
+    }
+  }
+  if (manifest.execconfig?.env?.FILES_PORT !== "${endpoint.web.port}") {
+    throw new Error("FILES_PORT must use the canonical web endpoint selector");
+  }
+  if (manifest.execconfig?.env?.FILES_URL !== "${endpoint.base_url.url}") {
+    throw new Error("FILES_URL must use the canonical base URL endpoint selector");
+  }
+  if (manifest.execconfig?.healthcheck?.url !== "${endpoint.health.url}") {
+    throw new Error("healthcheck must use the canonical health endpoint selector");
+  }
+}
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -344,6 +364,7 @@ try {
 }
 
 await verifyWorkspaceRegistry(extractRoot, verifyPort + 1);
+await verifyServiceManifest();
 
 async function verifyWorkspaceRegistry(extractRoot, port) {
   const workspaceRoot = path.join(repoRoot, "output", "verify-workspaces", targetPlatform);

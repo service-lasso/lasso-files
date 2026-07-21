@@ -8,15 +8,16 @@ Release-backed Service Lasso file manager service.
 
 - Service id: `files`
 - Runtime dependency: `@node`
-- Default port: `8199`
+- Default HTTP endpoint: `web` on `127.0.0.1:8199`
+- UI endpoint: `ui` at `${endpoint.ui.url}`
 - Data root: `${SERVICE_DATA_PATH}` or `FILES_DATA_PATH`
 - Allowed upload extensions: `FILES_ALLOWED_EXTENSIONS`
 - Blocked upload extensions: `FILES_BLOCKED_EXTENSIONS`
 - Max upload size: `FILES_MAXSIZE_MB`
 - Healthcheck: `GET /healthcheck` returns `200`
 - Global environment exported to dependants:
-  - `FILES_URL=http://127.0.0.1:${SERVICE_PORT}`
-  - `FILES_PORT=${SERVICE_PORT}`
+  - `FILES_URL=${endpoint.base_url.url}`
+  - `FILES_PORT=${endpoint.web.port}`
 
 ## Release Assets
 
