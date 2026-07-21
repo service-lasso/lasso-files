@@ -20,11 +20,35 @@ import "./Toolbar.scss";
 
 const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
   const [showToggleViewMenu, setShowToggleViewMenu] = useState(false);
-  const { currentFolder } = useFileNavigation();
+  const {
+    activeSourceId,
+    setActiveSourceId,
+    sourceOptions,
+    selectedSource,
+    currentFolder,
+    canMutateInCurrentLocation,
+    isCurrentLocationReadOnly,
+  } = useFileNavigation();
   const { selectedFiles, setSelectedFiles, handleDownload } = useSelection();
   const { clipBoard, setClipBoard, handleCutCopy, handlePasting } = useClipBoard();
   const { activeLayout } = useLayout();
   const t = useTranslation();
+  const hasReadOnlySelection = selectedFiles.some((file) => file.readOnly || file.virtual);
+  const canPasteHere = canMutateInCurrentLocation && !!clipBoard;
+  const writePermissions = {
+    ...permissions,
+    create: permissions.create && canMutateInCurrentLocation,
+    upload: permissions.upload && canMutateInCurrentLocation,
+    move: permissions.move && !hasReadOnlySelection,
+    rename: permissions.rename && !hasReadOnlySelection,
+    delete: permissions.delete && !hasReadOnlySelection,
+  };
+
+  const handleSourceChange = (event) => {
+    setSelectedFiles([]);
+    setClipBoard(null);
+    setActiveSourceId(event.target.value);
+  };
 
   // Toolbar Items
   const toolbarLeftItems = [
@@ -32,18 +56,21 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
       icon: <BsFolderPlus size={17} strokeWidth={0.3} />,
       text: t("newFolder"),
       permission: permissions.create,
+      disabled: !writePermissions.create,
       onClick: () => triggerAction.show("createFolder"),
     },
     {
       icon: <MdOutlineFileUpload size={18} />,
       text: t("upload"),
       permission: permissions.upload,
+      disabled: !writePermissions.upload,
       onClick: () => triggerAction.show("uploadFile"),
     },
     {
       icon: <FaRegPaste size={18} />,
       text: t("paste"),
       permission: !!clipBoard,
+      disabled: !canPasteHere,
       onClick: handleFilePasting,
     },
   ];
@@ -65,6 +92,7 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
   ];
 
   function handleFilePasting() {
+    if (!canPasteHere) return;
     handlePasting(currentFolder);
   }
 
@@ -83,6 +111,7 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
               <button
                 className="item-action file-action"
                 data-testid="toolbar-cut"
+                disabled={!writePermissions.move}
                 onClick={() => handleCutCopy(true)}
               >
                 <BsScissors size={18} />
@@ -104,7 +133,7 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
                 className="item-action file-action"
                 data-testid="toolbar-paste"
                 onClick={handleFilePasting}
-                // disabled={!clipBoard}
+                disabled={!canPasteHere}
               >
                 <FaRegPaste size={18} />
                 <span>{t("paste")}</span>
@@ -114,6 +143,7 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
               <button
                 className="item-action file-action"
                 data-testid="toolbar-rename"
+                disabled={!writePermissions.rename}
                 onClick={() => triggerAction.show("rename")}
               >
                 <BiRename size={19} />
@@ -134,6 +164,7 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
               <button
                 className="item-action file-action"
                 data-testid="toolbar-delete"
+                disabled={!writePermissions.delete}
                 onClick={() => triggerAction.show("delete")}
               >
                 <MdOutlineDelete size={19} />
@@ -163,12 +194,36 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
     <div className="toolbar">
       <div className="fm-toolbar">
         <div>
+          {sourceOptions.length > 0 && (
+            <div className="source-control">
+              <select
+                aria-label={t("source")}
+                data-testid="source-picker"
+                value={activeSourceId}
+                onChange={handleSourceChange}
+              >
+                {sourceOptions.map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.label}
+                  </option>
+                ))}
+              </select>
+              <span
+                className={`source-mode ${isCurrentLocationReadOnly ? "read-only" : "read-write"}`}
+                data-testid="source-mode"
+                title={selectedSource?.error || selectedSource?.status}
+              >
+                {isCurrentLocationReadOnly ? t("readOnly") : t("readWrite")}
+              </span>
+            </div>
+          )}
           {toolbarLeftItems
             .filter((item) => item.permission)
             .map((item, index) => (
               <button
                 className="item-action"
                 key={index}
+                disabled={item.disabled}
                 data-testid={
                   item.text === t("newFolder")
                     ? "toolbar-new-folder"

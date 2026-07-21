@@ -9,6 +9,10 @@ export const ClipBoardProvider = ({ children, onPaste, onCut, onCopy }) => {
   const { selectedFiles, setSelectedFiles } = useSelection();
 
   const handleCutCopy = (isMoving) => {
+    if (isMoving && selectedFiles.some((file) => file.readOnly || file.virtual)) {
+      return;
+    }
+
     setClipBoard({
       files: selectedFiles,
       isMoving: isMoving,
@@ -23,7 +27,9 @@ export const ClipBoardProvider = ({ children, onPaste, onCut, onCopy }) => {
 
   // Todo: Show error if destination folder already has file(s) with the same name
   const handlePasting = (destinationFolder) => {
+    if (!clipBoard) return;
     if (destinationFolder && !destinationFolder.isDirectory) return;
+    if (destinationFolder?.readOnly) return;
 
     const copiedFiles = clipBoard.files;
     const operationType = clipBoard.isMoving ? "move" : "copy";

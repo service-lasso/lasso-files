@@ -21,6 +21,7 @@ import "./FileManager.scss";
 
 const FileManager = ({
   files,
+  sources,
   fileUploadConfig,
   isLoading,
   onCreateFolder,
@@ -84,7 +85,11 @@ const FileManager = ({
       <Loader loading={isLoading} />
       <TranslationProvider language={language}>
         <FilesProvider filesData={files} onError={onError}>
-          <FileNavigationProvider initialPath={initialPath} onFolderChange={onFolderChange}>
+          <FileNavigationProvider
+            initialPath={initialPath}
+            onFolderChange={onFolderChange}
+            sources={sources}
+          >
             <SelectionProvider
               onDownload={onDownload}
               onSelect={onSelect}
@@ -174,6 +179,7 @@ FileManager.propTypes = {
       size: PropTypes.number,
     })
   ).isRequired,
+  sources: PropTypes.object,
   fileUploadConfig: PropTypes.shape({
     url: urlValidator,
     headers: PropTypes.objectOf(PropTypes.string),

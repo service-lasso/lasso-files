@@ -144,6 +144,11 @@ const FileItem = ({
   //
 
   const handleDragStart = (e) => {
+    if (file.readOnly || file.virtual) {
+      e.preventDefault();
+      return;
+    }
+
     e.dataTransfer.setDragImage(dragIconRef.current, 30, 50);
     e.dataTransfer.effectAllowed = "copy";
     handleCutCopy(true);
@@ -153,7 +158,7 @@ const FileItem = ({
 
   const handleDragEnterOver = (e) => {
     e.preventDefault();
-    if (fileSelected || !file.isDirectory) {
+    if (fileSelected || !file.isDirectory || file.readOnly) {
       e.dataTransfer.dropEffect = "none";
     } else {
       setTooltipPosition({ x: e.clientX, y: e.clientY + 12 });
@@ -172,7 +177,7 @@ const FileItem = ({
 
   const handleDrop = (e) => {
     e.preventDefault();
-    if (fileSelected || !file.isDirectory) return;
+    if (fileSelected || !file.isDirectory || file.readOnly) return;
 
     handlePasting(file);
     setDropZoneClass((prev) => (prev ? "" : prev));
@@ -246,6 +251,14 @@ const FileItem = ({
           </div>
         ) : (
           <span className="text-truncate file-name">{file.name}</span>
+        )}
+        {(file.rootId || file.readOnly) && (
+          <span
+            className={`file-mode-badge ${file.readOnly ? "read-only" : "read-write"}`}
+            data-testid={`file-mode-${file.name}`}
+          >
+            {file.readOnly ? "Read only" : "Read write"}
+          </span>
         )}
       </div>
 

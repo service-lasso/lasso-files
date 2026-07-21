@@ -10,6 +10,7 @@ import FileManager from "./FileManager/FileManager";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/file-system";
 const CONFIG_URL = import.meta.env.VITE_API_CONFIG_URL || "/api/config";
+const SOURCES_URL = import.meta.env.VITE_API_SOURCES_URL || "/api/sources";
 const FILE_PREVIEW_BASE_URL = import.meta.env.VITE_API_FILES_BASE_URL || "/content";
 const DEFAULT_ACCEPTED_FILE_TYPES = ".txt, .png, .jpg, .jpeg, .pdf, .doc, .docx, .exe";
 const DEFAULT_MAX_FILE_SIZE = 300 * 1024 * 1024;
@@ -21,6 +22,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [files, setFiles] = useState([]);
   const [currentPath, setCurrentPath] = useState("");
+  const [sources, setSources] = useState(null);
   const [acceptedFileTypes, setAcceptedFileTypes] = useState(DEFAULT_ACCEPTED_FILE_TYPES);
   const [maxFileSize, setMaxFileSize] = useState(DEFAULT_MAX_FILE_SIZE);
   const isMountRef = useRef(false);
@@ -42,9 +44,21 @@ function App() {
     if (isMountRef.current) return;
     isMountRef.current = true;
     getConfig();
+    getSources();
     getFiles();
   }, []);
   //
+
+  const getSources = async () => {
+    try {
+      const response = await fetch(SOURCES_URL);
+      if (!response.ok) return;
+      setSources(await response.json());
+    } catch (error) {
+      console.error(error);
+      setSources(null);
+    }
+  };
 
   const getConfig = async () => {
     try {
@@ -128,6 +142,7 @@ function App() {
 
   // Refresh Files
   const handleRefresh = () => {
+    getSources();
     getFiles();
   };
   //
@@ -161,6 +176,7 @@ function App() {
       <div className="file-manager-container">
         <FileManager
           files={files}
+          sources={sources}
           fileUploadConfig={fileUploadConfig}
           isLoading={isLoading}
           onCreateFolder={handleCreateFolder}

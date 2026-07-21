@@ -8,20 +8,21 @@ import { validateApiCallback } from "../utils/validateApiCallback";
 
 export const useShortcutHandler = (triggerAction, onRefresh, permissions) => {
   const { setClipBoard, handleCutCopy, handlePasting } = useClipBoard();
-  const { currentFolder, currentPathFiles } = useFileNavigation();
+  const { currentFolder, currentPathFiles, canMutateInCurrentLocation } = useFileNavigation();
   const { selectedFiles, setSelectedFiles, handleDownload } = useSelection();
   const { setActiveLayout } = useLayout();
+  const hasReadOnlySelection = selectedFiles.some((file) => file.readOnly || file.virtual);
 
   const triggerCreateFolder = () => {
-    permissions.create && triggerAction.show("createFolder");
+    permissions.create && canMutateInCurrentLocation && triggerAction.show("createFolder");
   };
 
   const triggerUploadFiles = () => {
-    permissions.upload && triggerAction.show("uploadFile");
+    permissions.upload && canMutateInCurrentLocation && triggerAction.show("uploadFile");
   };
 
   const triggerCutItems = () => {
-    permissions.move && handleCutCopy(true);
+    permissions.move && !hasReadOnlySelection && handleCutCopy(true);
   };
 
   const triggerCopyItems = () => {
@@ -29,11 +30,11 @@ export const useShortcutHandler = (triggerAction, onRefresh, permissions) => {
   };
 
   const triggerPasteItems = () => {
-    handlePasting(currentFolder);
+    canMutateInCurrentLocation && handlePasting(currentFolder);
   };
 
   const triggerRename = () => {
-    permissions.rename && triggerAction.show("rename");
+    permissions.rename && !hasReadOnlySelection && triggerAction.show("rename");
   };
 
   const triggerDownload = () => {
@@ -41,7 +42,7 @@ export const useShortcutHandler = (triggerAction, onRefresh, permissions) => {
   };
 
   const triggerDelete = () => {
-    if (permissions.delete && selectedFiles.length) {
+    if (permissions.delete && selectedFiles.length && !hasReadOnlySelection) {
       triggerAction.show("delete");
     }
   };
