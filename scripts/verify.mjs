@@ -3,6 +3,12 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  createFileSourceRegistry,
+  isInsideApprovedRoot,
+  LOCAL_DATA_ROOT_SOURCE_ID,
+  SERVICE_LASSO_WORKSPACES_SOURCE_ID,
+} from "../src/file-sources.mjs";
 import { packageFiles } from "./package.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -121,6 +127,58 @@ function expectItem(items, predicate, label) {
   return item;
 }
 
+function expectFileSourceRegistry() {
+  const standaloneRegistry = createFileSourceRegistry({
+    packageRoot: repoRoot,
+    env: {
+      FILES_DATA_PATH: path.join(repoRoot, "output", "provider-check", "data"),
+    },
+  });
+  if (standaloneRegistry.defaultSourceId !== LOCAL_DATA_ROOT_SOURCE_ID) {
+    throw new Error(`standalone default source changed: ${standaloneRegistry.defaultSourceId}`);
+  }
+  if (!standaloneRegistry.listSources().some((source) => source.id === LOCAL_DATA_ROOT_SOURCE_ID && source.default)) {
+    throw new Error("standalone local data root source was not registered as default");
+  }
+
+  const workspaceRegistry = createFileSourceRegistry({
+    packageRoot: repoRoot,
+    env: {
+      FILES_DATA_PATH: path.join(repoRoot, "output", "provider-check", "data"),
+      SERVICE_LASSO_WORKSPACE_ROOT: path.join(repoRoot, "output", "provider-check", "workspaces"),
+    },
+  });
+  if (workspaceRegistry.defaultSourceId !== SERVICE_LASSO_WORKSPACES_SOURCE_ID) {
+    throw new Error(`managed default source changed: ${workspaceRegistry.defaultSourceId}`);
+  }
+  const workspaceSource = workspaceRegistry.listSources().find((source) => source.id === SERVICE_LASSO_WORKSPACES_SOURCE_ID);
+  if (!workspaceSource?.roots?.[0]?.permissions?.canWrite || !workspaceSource.roots[0].permissions.canRemove) {
+    throw new Error(`workspace source permissions were not reported: ${JSON.stringify(workspaceSource)}`);
+  }
+  if (!workspaceRegistry.listSources().some((source) => source.id === LOCAL_DATA_ROOT_SOURCE_ID)) {
+    throw new Error("managed registry dropped local-data-root");
+  }
+
+  const confinedRoot = path.join(repoRoot, "output", "provider-check", "data");
+  const escapedSibling = path.join(repoRoot, "output", "provider-check", "outside.txt");
+  if (isInsideApprovedRoot(confinedRoot, escapedSibling)) {
+    throw new Error("isInsideApprovedRoot allowed a path outside the approved root");
+  }
+  if (!isInsideApprovedRoot(confinedRoot, path.join(confinedRoot, "nested", "file.txt"))) {
+    throw new Error("isInsideApprovedRoot rejected a path inside the approved root");
+  }
+
+  try {
+    standaloneRegistry.defaultSource.resolve("../outside.txt");
+    throw new Error("source resolve did not reject a traversal path");
+  } catch (error) {
+    if (!(error instanceof Error) || error.status !== 400) {
+      throw error;
+    }
+  }
+}
+
+expectFileSourceRegistry();
 const archivePath = await packageFiles(targetPlatform, serviceVersion);
 const expectedArchive = path.join(repoRoot, "dist", archiveName(targetPlatform));
 if (archivePath !== expectedArchive || !existsSync(expectedArchive)) {
@@ -163,6 +221,20 @@ try {
   if (!config.acceptedFileTypes.includes(".pdf") || config.blockedFileTypes !== "" || config.maxUploadBytes !== 300 * 1024 * 1024) {
     throw new Error(`unexpected config response: ${JSON.stringify(config)}`);
   }
+
+  const sourceConfig = await jsonRequest(baseUrl, "/api/file-sources", undefined, 200, "get file sources");
+  if (sourceConfig.defaultSourceId !== LOCAL_DATA_ROOT_SOURCE_ID) {
+    throw new Error(`unexpected default file source: ${JSON.stringify(sourceConfig)}`);
+  }
+  const localSource = sourceConfig.sources.find((source) => source.id === LOCAL_DATA_ROOT_SOURCE_ID);
+  if (!localSource?.roots?.[0]?.permissions?.canUpload || !localSource.roots[0].permissions.canRemove) {
+    throw new Error(`local data root did not report expected permissions: ${JSON.stringify(sourceConfig)}`);
+  }
+  await expectStatus(
+    await fetch(`${baseUrl}/api/file-system?sourceId=${encodeURIComponent("not-a-registered-source")}`),
+    400,
+    "reject unknown source id",
+  );
 
   const updatedConfig = await jsonRequest(
     baseUrl,
@@ -269,6 +341,11 @@ try {
   expectItem(list, (item) => item._id === wildcardUpload._id && item.name === "allowed.customtype", "wildcard upload");
   expectItem(list, (item) => item._id === uploaded._id && item.parentId === docs._id, "uploaded file");
   expectItem(list, (item) => item._id === nested._id && item.parentId === docs._id, "nested folder");
+  expectItem(
+    list,
+    (item) => item._id === uploaded._id && item.sourceId === LOCAL_DATA_ROOT_SOURCE_ID && item.permissions?.canDownload,
+    "uploaded file source metadata",
+  );
 
   const download = await expectStatus(
     await fetch(`${baseUrl}/api/file-system/download?files=${encodeURIComponent(uploaded._id)}`),
@@ -447,6 +524,13 @@ async function verifyWorkspaceRegistry(extractRoot, port) {
     const sources = await jsonRequest(baseUrl, "/api/sources", undefined, 200, "workspace sources");
     if (sources.provider !== "service-lasso-workspaces" || sources.status !== "ok" || sources.services.length !== 1) {
       throw new Error(`unexpected workspace source status: ${JSON.stringify(sources)}`);
+    }
+    if (!Array.isArray(sources.sources) || !sources.sources.some((source) => (source.sourceId || source.id) === "local-data-root")) {
+      throw new Error(`managed /api/sources omitted local-data-root: ${JSON.stringify(sources)}`);
+    }
+    const fileSources = await jsonRequest(baseUrl, "/api/file-sources", undefined, 200, "managed file sources");
+    if (fileSources.defaultSourceId !== "service-lasso-workspaces") {
+      throw new Error(`managed default source changed: ${JSON.stringify(fileSources)}`);
     }
 
     const list = await listItems(baseUrl);
