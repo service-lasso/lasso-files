@@ -8,6 +8,52 @@
   "status": "30",
   "icon": "pi pi-folder",
   "servicelocation": 10,
+  "endpoints": [
+    {
+      "id": "web",
+      "kind": "network",
+      "label": "Files HTTP API/UI",
+      "direction": "inbound",
+      "transport": "tcp",
+      "protocol": "http",
+      "bind": "127.0.0.1",
+      "port": {
+        "default": 8199,
+        "strategy": "preferred"
+      },
+      "exposure": "local",
+      "required": true,
+      "primary": true
+    },
+    {
+      "id": "base_url",
+      "kind": "url",
+      "label": "Files base URL",
+      "target": "web",
+      "url": "http://${endpoint.web.bind}:${endpoint.web.port}",
+      "exposure": "local",
+      "required": true
+    },
+    {
+      "id": "ui",
+      "kind": "url",
+      "label": "Files UI",
+      "target": "web",
+      "url": "http://${endpoint.web.bind}:${endpoint.web.port}/files",
+      "exposure": "local",
+      "required": true,
+      "primary": true
+    },
+    {
+      "id": "health",
+      "kind": "url",
+      "label": "Files healthcheck",
+      "target": "web",
+      "url": "http://${endpoint.web.bind}:${endpoint.web.port}/healthcheck",
+      "exposure": "local",
+      "required": true
+    }
+  ],
   "artifact": {
     "source": {
       "type": "github-release",
@@ -46,21 +92,21 @@
     },
     "env": {
       "NODE_ENV": "production",
-      "FILES_PORT": "${SERVICE_PORT}",
-      "FILES_URL": "http://127.0.0.1:${SERVICE_PORT}",
+      "FILES_PORT": "${endpoint.web.port}",
+      "FILES_URL": "${endpoint.base_url.url}",
       "FILES_DATA_PATH": "${SERVICE_DATA_PATH}",
       "FILES_ALLOWED_EXTENSIONS": ".txt,.png,.jpg,.jpeg,.pdf,.doc,.docx,.exe",
       "FILES_BLOCKED_EXTENSIONS": "",
       "FILES_MAXSIZE_MB": "300"
     },
     "globalenv": {
-      "FILES_URL": "http://127.0.0.1:${SERVICE_PORT}",
-      "FILES_PORT": "${SERVICE_PORT}"
+      "FILES_URL": "${endpoint.base_url.url}",
+      "FILES_PORT": "${endpoint.web.port}"
     },
     "serviceport": 8199,
     "healthcheck": {
       "type": "http",
-      "url": "http://127.0.0.1:${SERVICE_PORT}/healthcheck",
+      "url": "${endpoint.health.url}",
       "expected_status": 200,
       "retries": 180,
       "interval_ms": 500
