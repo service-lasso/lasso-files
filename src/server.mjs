@@ -6,8 +6,8 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { stat } from "node:fs/promises";
 import { createFilesConfig } from "./files-config.mjs";
-import { FileStore } from "./file-store.mjs";
 import { normalizeRelativePath } from "./path-ids.mjs";
+import { createFileSystemStore } from "./workspace-store.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicRoot =
@@ -20,7 +20,7 @@ const dataRoot = path.resolve(
 const port = Number(process.env.SERVICE_PORT || process.env.FILES_PORT || process.env.PORT || 8199);
 const filesConfig = createFilesConfig();
 
-const store = new FileStore(dataRoot);
+const store = await createFileSystemStore({ dataRoot, env: process.env });
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -57,7 +57,12 @@ app.get("/healthcheck", asyncHandler(async (_request, response) => {
     status: "ok",
     service: "files",
     dataRoot,
+    sources: await describeSources(),
   });
+}));
+
+app.get("/api/sources", asyncHandler(async (_request, response) => {
+  response.json(await describeSources());
 }));
 
 app.get("/api/file-system", asyncHandler(async (_request, response) => {
@@ -212,4 +217,25 @@ function hasConfigUpdate(body = {}) {
   return ["allowedExtensions", "acceptedFileTypes", "blockedExtensions", "blockedFileTypes"].some((key) =>
     Object.hasOwn(body, key),
   );
+}
+
+async function describeSources() {
+  if (typeof store.describeSources === "function") {
+    return store.describeSources();
+  }
+
+  return {
+    provider: "local-data-root",
+    status: "ok",
+    services: [],
+    roots: [
+      {
+        sourceId: "local-data-root",
+        rootId: "data",
+        label: "Files",
+        path: dataRoot,
+        mode: "read-write",
+      },
+    ],
+  };
 }

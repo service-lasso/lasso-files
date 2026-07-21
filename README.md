@@ -115,6 +115,39 @@ The default UI URL is:
 http://127.0.0.1:8199/files
 ```
 
+### Service Lasso Workspace Provider
+
+Managed launches can browse Service Lasso-approved workspace roots instead of the standalone local data root. Enable the provider with:
+
+```powershell
+$env:FILES_SOURCE_PROVIDER = "service-lasso-workspaces"
+$env:FILES_WORKSPACES_REGISTRY_PATH = "C:\path\to\workspace-registry.json"
+npm run dev
+```
+
+`SERVICE_LASSO_MANAGED=1`, `SERVICE_LASSO_FILES_SOURCE_PROVIDER=service-lasso-workspaces`, or a configured workspace registry also selects this provider.
+
+The registry can be provided by file, inline JSON, or API:
+
+- `FILES_WORKSPACES_REGISTRY_PATH` or `SERVICE_LASSO_WORKSPACES_REGISTRY_PATH`
+- `FILES_WORKSPACES_REGISTRY_JSON` or `SERVICE_LASSO_WORKSPACES_REGISTRY_JSON`
+- `FILES_WORKSPACES_REGISTRY_URL` or `SERVICE_LASSO_WORKSPACES_REGISTRY_URL`
+
+Registry entries use this shape:
+
+```json
+{
+  "sourceId": "service-lasso-workspaces",
+  "serviceId": "nginx",
+  "rootId": "workspace",
+  "label": "Workspace",
+  "path": "C:\\projects\\service-lasso\\workspace\\nginx",
+  "mode": "read-write"
+}
+```
+
+`GET /api/sources` reports provider availability and groups roots by `serviceId`. `GET /api/file-system` includes virtual service and root folders with `sourceId`, `serviceId`, `rootId`, `mode`, and `readOnly` metadata. Roots marked `hidden` or `protected` are omitted. Read-only roots can be browsed and downloaded, but create, upload, rename, move, and delete operations return `403`.
+
 ## Local Verification
 
 ```powershell
