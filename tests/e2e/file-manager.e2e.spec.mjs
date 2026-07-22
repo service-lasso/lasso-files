@@ -138,12 +138,104 @@ test("file manager UI opens workspace source deep links and disables read-only w
   await expect(page.getByTestId("source-state")).toContainText("Registry unavailable");
 });
 
+test("file manager UI requests a Service Lasso archive for a selected workspace folder", async ({ page }) => {
+  const archiveRequests = [];
+  await routeWorkspaceFiles(page);
+  await page.route("**/api/file-export/archive", async (route) => {
+    archiveRequests.push(route.request().postDataJSON());
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        archiveName: "nginx-runtime.7z",
+        size: 4096,
+        checksum: "sha256:archive",
+        downloadUrl: "/api/artifacts/nginx-runtime.7z",
+      }),
+    });
+  });
+
+  await page.goto("/files?source=service-lasso-workspaces&service=nginx&root=config");
+  await selectItem(page, "runtime");
+  await expect(page.getByTestId("toolbar-archive")).toBeEnabled();
+  await expect(page.getByTestId("toolbar-archive")).toContainText("Archive folder");
+  await page.getByTestId("toolbar-archive").click();
+  await page.getByTestId("modal").getByRole("button", { name: "Archive folder" }).click();
+
+  await expect(page.getByTestId("archive-result")).toContainText("Archive artifact created.");
+  await expect(page.getByTestId("archive-result")).toContainText("nginx-runtime.7z");
+  await expect.poll(() => archiveRequests).toHaveLength(1);
+  expect(archiveRequests[0]).toEqual({
+    source: {
+      type: "file-selection",
+      sourceId: "service-lasso-workspaces",
+      serviceId: "nginx",
+      rootId: "config",
+      paths: ["runtime"],
+      archiveFormat: "7z",
+    },
+  });
+});
+
+test("file manager UI shows Service Lasso archive failures", async ({ page }) => {
+  await routeWorkspaceFiles(page);
+  await page.route("**/api/file-export/archive", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Archive provider unavailable." }),
+    });
+  });
+
+  await page.goto("/files?source=service-lasso-workspaces&service=nginx&root=config&path=/runtime");
+  await selectItem(page, "nginx.conf");
+  await page.getByTestId("toolbar-archive").click();
+  await page.getByTestId("modal").getByRole("button", { name: "Archive selection" }).click();
+
+  await expect(page.getByTestId("archive-error")).toContainText("Archive provider unavailable.");
+});
+
 async function expectFileManagerToFillViewport(page) {
   const viewport = page.viewportSize();
   const box = await page.getByTestId("file-manager").boundingBox();
   expect(box).not.toBeNull();
   expect(box.width).toBeGreaterThan(viewport.width * 0.9);
   expect(box.height).toBeGreaterThan(viewport.height * 0.9);
+}
+
+async function routeWorkspaceFiles(page) {
+  const workspaceFiles = workspaceSourceFixture();
+  await page.route("**/api/sources", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        sources: [
+          { sourceId: "local-data-root", label: "Local files", status: "ok" },
+          { sourceId: "service-lasso-workspaces", label: "Service workspaces", status: "ok" },
+          {
+            sourceId: "unavailable-source",
+            label: "Unavailable source",
+            status: "unavailable",
+            error: "Registry unavailable",
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/file-system", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(workspaceFiles),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Workspace root is read-only." }),
+    });
+  });
 }
 
 async function createFolder(page, name) {
