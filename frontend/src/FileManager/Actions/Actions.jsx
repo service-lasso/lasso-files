@@ -3,6 +3,7 @@ import Modal from "../../components/Modal/Modal";
 import DeleteAction from "./Delete/Delete.action";
 import UploadFileAction from "./UploadFile/UploadFile.action";
 import PreviewFileAction from "./PreviewFile/PreviewFile.action";
+import ArchiveAction from "./Archive/Archive.action";
 import { useSelection } from "../../contexts/SelectionContext";
 import { useShortcutHandler } from "../../hooks/useShortcutHandler";
 import { useTranslation } from "../../contexts/TranslationProvider";
@@ -12,6 +13,7 @@ const Actions = ({
   onFileUploading,
   onFileUploaded,
   onDelete,
+  onArchive,
   onRefresh,
   maxFileSize,
   filePreviewPath,
@@ -45,6 +47,14 @@ const Actions = ({
       title: t("delete"),
       component: <DeleteAction triggerAction={triggerAction} onDelete={onDelete} />,
       width: "25%",
+    },
+    archive: {
+      title:
+        selectedFiles.length === 1 && selectedFiles[0]?.isDirectory
+          ? t("archiveFolder")
+          : t("archiveSelection"),
+      component: <ArchiveAction triggerAction={triggerAction} onArchive={onArchive} />,
+      width: "35%",
     },
     previewFile: {
       title: t("preview"),

@@ -33,6 +33,7 @@ const FileManager = ({
   onRename,
   onDownload,
   onDelete = () => null,
+  onArchive = () => null,
   onLayoutChange = () => {},
   onRefresh,
   onFileOpen = () => {},
@@ -149,6 +150,7 @@ const FileManager = ({
                     onFileUploading={onFileUploading}
                     onFileUploaded={onFileUploaded}
                     onDelete={onDelete}
+                    onArchive={onArchive}
                     onRefresh={onRefresh}
                     maxFileSize={maxFileSize}
                     filePreviewPath={filePreviewPath}
@@ -191,6 +193,7 @@ FileManager.propTypes = {
   onFileUploaded: PropTypes.func,
   onRename: PropTypes.func,
   onDelete: PropTypes.func,
+  onArchive: PropTypes.func,
   onCut: PropTypes.func,
   onCopy: PropTypes.func,
   onPaste: PropTypes.func,
@@ -221,6 +224,7 @@ FileManager.propTypes = {
     copy: PropTypes.bool,
     rename: PropTypes.bool,
     download: PropTypes.bool,
+    archive: PropTypes.bool,
     delete: PropTypes.bool,
   }),
   collapsibleNav: PropTypes.bool,

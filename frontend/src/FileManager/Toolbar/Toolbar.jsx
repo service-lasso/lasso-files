@@ -3,6 +3,7 @@ import { BsCopy, BsFolderPlus, BsGridFill, BsScissors } from "react-icons/bs";
 import { FiRefreshCw } from "react-icons/fi";
 import {
   MdClear,
+  MdOutlineArchive,
   MdOutlineDelete,
   MdOutlineFileDownload,
   MdOutlineFileUpload,
@@ -34,6 +35,9 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
   const { activeLayout } = useLayout();
   const t = useTranslation();
   const hasReadOnlySelection = selectedFiles.some((file) => file.readOnly || file.virtual);
+  const canArchiveSelection = selectedFiles.every(
+    (file) => file.sourceId === "service-lasso-workspaces" && file.serviceId && file.rootId
+  );
   const canPasteHere = canMutateInCurrentLocation && !!clipBoard;
   const writePermissions = {
     ...permissions,
@@ -101,6 +105,11 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
     setSelectedFiles([]);
   };
 
+  const archiveLabel =
+    selectedFiles.length === 1 && selectedFiles[0]?.isDirectory
+      ? t("archiveFolder")
+      : t("archiveSelection");
+
   // Selected File/Folder Actions
   if (selectedFiles.length > 0) {
     return (
@@ -158,6 +167,18 @@ const Toolbar = ({ onLayoutChange, onRefresh, triggerAction, permissions }) => {
               >
                 <MdOutlineFileDownload size={19} />
                 <span>{t("download")}</span>
+              </button>
+            )}
+            {permissions.archive && (
+              <button
+                className="item-action file-action"
+                data-testid="toolbar-archive"
+                disabled={!canArchiveSelection}
+                title={!canArchiveSelection ? t("archiveWorkspaceOnly") : archiveLabel}
+                onClick={() => triggerAction.show("archive")}
+              >
+                <MdOutlineArchive size={19} />
+                <span>{archiveLabel}</span>
               </button>
             )}
             {permissions.delete && (

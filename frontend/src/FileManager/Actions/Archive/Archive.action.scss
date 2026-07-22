@@ -1,0 +1,43 @@
+.file-archive-action {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 0 2px;
+
+  p {
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .file-archive-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .file-archive-status {
+    color: #374151;
+  }
+
+  .file-archive-result,
+  .file-archive-error {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .file-archive-error {
+    color: #991b1b;
+  }
+
+  .file-archive-download {
+    align-items: center;
+    border: 1px solid var(--file-manager-primary-color);
+    border-radius: 4px;
+    color: var(--file-manager-primary-color);
+    display: inline-flex;
+    font-size: 14px;
+    padding: 0.4rem 0.8rem;
+    text-decoration: none;
+  }
+}

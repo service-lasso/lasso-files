@@ -5,5 +5,6 @@ export const defaultPermissions = {
   copy: true,
   rename: true,
   download: true,
+  archive: true,
   delete: true,
 };

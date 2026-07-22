@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { archiveSelectionAPI } from "./api/archiveAPI";
 import { createFolderAPI } from "./api/createFolderAPI";
 import { deleteAPI } from "./api/deleteAPI";
 import { downloadFile } from "./api/downloadFileAPI";
@@ -159,6 +160,10 @@ function App() {
     await downloadFile(files);
   };
 
+  const handleArchive = async (files) => {
+    return archiveSelectionAPI(files);
+  };
+
   const handleCut = (files) => {
     console.log("Moving Files", files);
   };
@@ -187,6 +192,7 @@ function App() {
           onPaste={handlePaste}
           onRename={handleRename}
           onDownload={handleDownload}
+          onArchive={handleArchive}
           onDelete={handleDelete}
           onLayoutChange={handleLayoutChange}
           onRefresh={handleRefresh}
