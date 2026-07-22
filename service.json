@@ -54,6 +54,16 @@
       "required": true
     }
   ],
+  "healthchecks": [
+    {
+      "id": "files-http-health",
+      "type": "http",
+      "url": "${endpoint.health.url}",
+      "expected_status": 200,
+      "retries": 180,
+      "interval": 500
+    }
+  ],
   "artifact": {
     "source": {
       "type": "github-release",
@@ -104,13 +114,6 @@
       "FILES_PORT": "${endpoint.web.port}"
     },
     "serviceport": 8199,
-    "healthcheck": {
-      "type": "http",
-      "url": "${endpoint.health.url}",
-      "expected_status": 200,
-      "retries": 180,
-      "interval_ms": 500
-    },
     "depend_on": [
       "@node"
     ]

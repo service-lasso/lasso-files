@@ -25,8 +25,22 @@ async function verifyServiceManifest() {
   if (manifest.execconfig?.env?.FILES_URL !== "${endpoint.base_url.url}") {
     throw new Error("FILES_URL must use the canonical base URL endpoint selector");
   }
-  if (manifest.execconfig?.healthcheck?.url !== "${endpoint.health.url}") {
-    throw new Error("healthcheck must use the canonical health endpoint selector");
+  if (manifest.execconfig?.healthcheck) {
+    throw new Error("service.json must not use singular execconfig.healthcheck");
+  }
+  const healthchecks = manifest.healthchecks;
+  if (!Array.isArray(healthchecks) || healthchecks.length !== 1) {
+    throw new Error("service.json must declare exactly one top-level healthchecks[] item");
+  }
+  const [httpHealthcheck] = healthchecks;
+  if (httpHealthcheck.id !== "files-http-health") {
+    throw new Error("healthchecks[] item must have a stable files-http-health id");
+  }
+  if (httpHealthcheck.type !== "http" || httpHealthcheck.url !== "${endpoint.health.url}") {
+    throw new Error("healthchecks[] must use the canonical health endpoint selector");
+  }
+  if (httpHealthcheck.expected_status !== 200 || httpHealthcheck.retries !== 180 || httpHealthcheck.interval !== 500) {
+    throw new Error(`unexpected healthchecks[] readiness settings: ${JSON.stringify(httpHealthcheck)}`);
   }
 }
 
