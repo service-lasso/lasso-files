@@ -14,6 +14,10 @@ Release-backed Service Lasso file manager service.
 - Allowed upload extensions: `FILES_ALLOWED_EXTENSIONS`
 - Blocked upload extensions: `FILES_BLOCKED_EXTENSIONS`
 - Max upload size: `FILES_MAXSIZE_MB`
+- File sources:
+  - `local-data-root` points at `FILES_DATA_PATH`, `SERVICE_DATA_PATH`, or `./data`.
+  - `service-lasso-workspaces` points at `FILES_SERVICE_LASSO_WORKSPACES_PATH` or `SERVICE_LASSO_WORKSPACE_ROOT` when provided by a managed Service Lasso runtime.
+  - `FILES_DEFAULT_SOURCE_ID` can choose a registered source explicitly.
 - Healthcheck: `GET /healthcheck` returns `200`
 - Global environment exported to dependants:
   - `FILES_URL=${endpoint.base_url.url}`
@@ -96,6 +100,19 @@ Runtime config API:
 - `GET /api/config` returns `allowedExtensions`, `blockedExtensions`, `acceptedFileTypes`, `blockedFileTypes`, `allowAllFiles`, `maxUploadBytes`, and `maxUploadMb`.
 - `PUT /api/config` or `PATCH /api/config` with `{ "allowedExtensions": [".txt", ".pdf"], "blockedExtensions": [".exe"] }` updates the in-memory extension rules.
 - The runtime update is intentionally not persisted; restart-time config still comes from environment/service manifest values.
+
+## File Sources
+
+The server routes file operations through source providers instead of assuming one local root. Standalone/dev mode registers `local-data-root` as the default source so the existing `FILES_DATA_PATH` behaviour stays unchanged. Managed Service Lasso runtimes can also register `service-lasso-workspaces` from a workspace registry or from `SERVICE_LASSO_WORKSPACE_ROOT` / `FILES_SERVICE_LASSO_WORKSPACES_PATH`. When that source is present, it becomes the default unless `FILES_DEFAULT_SOURCE_ID` is set. `local-data-root` remains registered and visible.
+
+Source ids are stable and visible from:
+
+- `GET /api/file-sources`
+- `GET /api/sources`
+- `GET /healthcheck`
+- `GET /api/file-system` item fields `sourceId`, `sourceRootId`, and `permissions`
+
+Each source reports read/write/remove support per root. Providers cannot resolve paths outside their approved roots. Existing endpoints still default to the active source. Requests may opt into a registered source with `sourceId` in the query string or JSON/form body.
 
 ## Run With Service Lasso
 

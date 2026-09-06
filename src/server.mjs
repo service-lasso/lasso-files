@@ -6,21 +6,18 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { stat } from "node:fs/promises";
 import { createFilesConfig } from "./files-config.mjs";
+import { createFileSourceRegistry, LOCAL_DATA_ROOT_SOURCE_ID } from "./file-sources.mjs";
 import { normalizeRelativePath } from "./path-ids.mjs";
-import { createFileSystemStore } from "./workspace-store.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicRoot =
   [path.join(packageRoot, "public"), path.join(packageRoot, "build", "public")].find((candidate) =>
     existsSync(path.join(candidate, "index.html")),
   ) ?? null;
-const dataRoot = path.resolve(
-  process.env.FILES_DATA_PATH || process.env.SERVICE_DATA_PATH || path.join(packageRoot, "data"),
-);
 const port = Number(process.env.SERVICE_PORT || process.env.FILES_PORT || process.env.PORT || 8199);
 const filesConfig = createFilesConfig();
+const sourceRegistry = createFileSourceRegistry({ packageRoot });
 
-const store = await createFileSystemStore({ dataRoot, env: process.env });
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -47,16 +44,23 @@ if (publicRoot) {
   app.use(express.static(publicRoot, { index: false }));
 }
 
+/**
+ * Wraps an async Express handler so rejections reach the shared error middleware.
+ *
+ * @param {(request: import("express").Request, response: import("express").Response, next: import("express").NextFunction) => unknown} handler
+ * @returns {import("express").RequestHandler}
+ */
 const asyncHandler = (handler) => (request, response, next) => {
   Promise.resolve(handler(request, response, next)).catch(next);
 };
 
 app.get("/healthcheck", asyncHandler(async (_request, response) => {
-  await store.ensureRoot();
+  await sourceRegistry.defaultSource.ensureRoot();
   response.json({
     status: "ok",
     service: "files",
-    dataRoot,
+    dataRoot: sourceRegistry.dataRoot,
+    defaultSourceId: sourceRegistry.defaultSourceId,
     sources: await describeSources(),
   });
 }));
@@ -65,8 +69,16 @@ app.get("/api/sources", asyncHandler(async (_request, response) => {
   response.json(await describeSources());
 }));
 
-app.get("/api/file-system", asyncHandler(async (_request, response) => {
-  response.json(await store.list());
+app.get("/api/file-sources", asyncHandler(async (_request, response) => {
+  await sourceRegistry.defaultSource.ensureRoot();
+  response.json({
+    defaultSourceId: sourceRegistry.defaultSourceId,
+    sources: sourceRegistry.listSources(),
+  });
+}));
+
+app.get("/api/file-system", asyncHandler(async (request, response) => {
+  response.json(await sourceFromRequest(request).list());
 }));
 
 app.get("/api/config", (_request, response) => {
@@ -92,38 +104,38 @@ app.put("/api/config", (request, response) => {
 });
 
 app.post("/api/file-system/folder", asyncHandler(async (request, response) => {
-  response.status(201).json(await store.createFolder(request.body?.name, request.body?.parentId));
+  response.status(201).json(await sourceFromRequest(request).createFolder(request.body?.name, request.body?.parentId));
 }));
 
 app.post("/api/file-system/upload", upload.single("file"), asyncHandler(async (request, response) => {
-  response.status(201).json(await store.writeFile(request.file, request.body?.parentId));
+  response.status(201).json(await sourceFromRequest(request).writeFile(request.file, request.body?.parentId));
 }));
 
 app.post("/api/file-system/copy", asyncHandler(async (request, response) => {
-  await store.copy(request.body?.sourceIds, request.body?.destinationId);
+  await sourceFromRequest(request).copy(request.body?.sourceIds, request.body?.destinationId);
   response.json({ message: "Item(s) copied successfully!" });
 }));
 
 app.put("/api/file-system/move", asyncHandler(async (request, response) => {
-  await store.move(request.body?.sourceIds, request.body?.destinationId);
+  await sourceFromRequest(request).move(request.body?.sourceIds, request.body?.destinationId);
   response.json({ message: "Item(s) moved successfully!" });
 }));
 
 app.patch("/api/file-system/rename", asyncHandler(async (request, response) => {
-  const item = await store.rename(request.body?.id, request.body?.newName);
+  const item = await sourceFromRequest(request).rename(request.body?.id, request.body?.newName);
   response.json({ message: "File or Folder renamed successfully!", item });
 }));
 
 app.delete("/api/file-system", asyncHandler(async (request, response) => {
-  await store.delete(request.body?.ids);
+  await sourceFromRequest(request).delete(request.body?.ids);
   response.json({ message: "File(s) or Folder(s) deleted successfully." });
 }));
 
 app.get("/api/file-system/download", asyncHandler(async (request, response) => {
-  await store.sendDownload(request.query.files, response);
+  await sourceFromRequest(request).sendDownload(request.query.files, response);
 }));
 
-app.use("/content", express.static(dataRoot, { fallthrough: false }));
+app.use("/content", express.static(sourceRegistry.localDataRoot.root, { fallthrough: false }));
 
 app.get(["/", "/files"], (_request, response) => {
   if (!publicRoot) {
@@ -165,11 +177,12 @@ app.put("/api/options", (request, response) => {
 });
 
 app.get("/api/*", asyncHandler(async (request, response) => {
+  const source = sourceFromRequest(request);
   const relativePath = normalizeRelativePath(request.params[0] || "");
-  const absolute = store.resolve(relativePath);
+  const absolute = source.resolve(relativePath);
   const stats = await stat(absolute);
   if (stats.isDirectory()) {
-    response.json(await store.legacyList(relativePath));
+    response.json(await source.legacyList(relativePath));
     return;
   }
   response.download(absolute, path.basename(relativePath));
@@ -177,18 +190,19 @@ app.get("/api/*", asyncHandler(async (request, response) => {
 
 app.delete("/api/*", asyncHandler(async (request, response) => {
   const relativePath = normalizeRelativePath(request.params[0] || "");
-  await store.delete([Buffer.from(relativePath, "utf8").toString("base64url")]);
+  await sourceFromRequest(request).delete([Buffer.from(relativePath, "utf8").toString("base64url")]);
   response.send("Deleting successful!");
 }));
 
 app.post("/api/*", upload.single("file"), asyncHandler(async (request, response) => {
+  const source = sourceFromRequest(request);
   const relativePath = normalizeRelativePath(request.params[0] || "");
   const type = request.query.type;
   if (type === "CREATE_FOLDER") {
     const parent = path.posix.dirname(relativePath);
     const name = path.posix.basename(relativePath);
     const parentId = parent === "." ? null : Buffer.from(parent, "utf8").toString("base64url");
-    await store.createFolder(name, parentId);
+    await source.createFolder(name, parentId);
     response.send("Creating folder successful!");
     return;
   }
@@ -201,11 +215,16 @@ app.use((error, _request, response, _next) => {
   response.status(status).json({ error: error.message || "Internal server error" });
 });
 
-await store.ensureRoot();
+await sourceRegistry.defaultSource.ensureRoot();
 const server = app.listen(port, "0.0.0.0", () => {
-  console.log(`[lasso-files] listening on ${port}, data root ${dataRoot}`);
+  console.log(`[lasso-files] listening on ${port}, source ${sourceRegistry.defaultSourceId}, root ${sourceRegistry.dataRoot}`);
 });
 
+/**
+ * Stops the HTTP server and exits the process.
+ *
+ * @returns {void}
+ */
 function stop() {
   server.close(() => process.exit(0));
 }
@@ -213,29 +232,70 @@ function stop() {
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
 
+/**
+ * @param {object} [body]
+ * @returns {boolean}
+ */
 function hasConfigUpdate(body = {}) {
   return ["allowedExtensions", "acceptedFileTypes", "blockedExtensions", "blockedFileTypes"].some((key) =>
     Object.hasOwn(body, key),
   );
 }
 
+/**
+ * Resolves the source named by `sourceId`, or the process default source.
+ *
+ * @param {import("express").Request} request
+ * @returns {import("./file-sources.mjs").FileSourceProvider}
+ */
+function sourceFromRequest(request) {
+  return sourceRegistry.getSource(request.body?.sourceId || request.query?.sourceId);
+}
+
+/**
+ * Builds the UI-facing `/api/sources` payload from the active provider, then
+ * appends every registered source id so local-data-root stays visible in
+ * managed mode.
+ *
+ * @returns {Promise<object>}
+ */
 async function describeSources() {
-  if (typeof store.describeSources === "function") {
-    return store.describeSources();
+  const defaultSource = sourceRegistry.defaultSource;
+  const description =
+    typeof defaultSource.describeSources === "function"
+      ? await defaultSource.describeSources()
+      : {
+          provider: LOCAL_DATA_ROOT_SOURCE_ID,
+          status: "ok",
+          services: [],
+          roots: [
+            {
+              sourceId: LOCAL_DATA_ROOT_SOURCE_ID,
+              rootId: "data",
+              label: "Files",
+              path: sourceRegistry.dataRoot,
+              mode: "read-write",
+            },
+          ],
+        };
+
+  const listed = sourceRegistry.listSources().map((source) => ({
+    sourceId: source.id,
+    id: source.id,
+    label: source.name,
+    status: "ok",
+  }));
+  const existing = Array.isArray(description.sources) ? description.sources : [];
+  const sources = [...existing];
+  for (const item of listed) {
+    if (!sources.some((candidate) => (candidate.sourceId || candidate.id) === item.sourceId)) {
+      sources.push(item);
+    }
   }
 
   return {
-    provider: "local-data-root",
-    status: "ok",
-    services: [],
-    roots: [
-      {
-        sourceId: "local-data-root",
-        rootId: "data",
-        label: "Files",
-        path: dataRoot,
-        mode: "read-write",
-      },
-    ],
+    ...description,
+    defaultSourceId: sourceRegistry.defaultSourceId,
+    sources,
   };
 }
