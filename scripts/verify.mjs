@@ -169,12 +169,17 @@ function expectFileSourceRegistry() {
   }
 
   try {
-    standaloneRegistry.defaultSource.resolve("../outside.txt");
-    throw new Error("source resolve did not reject a traversal path");
+    standaloneRegistry.getSource("not-a-registered-source");
+    throw new Error("getSource did not reject an unknown source id");
   } catch (error) {
     if (!(error instanceof Error) || error.status !== 400) {
       throw error;
     }
+  }
+
+  const resolvedInsideRoot = standaloneRegistry.defaultSource.resolve("../outside.txt");
+  if (!isInsideApprovedRoot(confinedRoot, resolvedInsideRoot)) {
+    throw new Error("source resolve escaped the approved root");
   }
 }
 
